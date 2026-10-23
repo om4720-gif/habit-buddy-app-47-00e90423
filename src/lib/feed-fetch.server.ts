@@ -28,7 +28,7 @@ export function checkFeedUrl(raw: string): { ok: true; url: URL } | { ok: false;
   return { ok: true, url };
 }
 
-export async function fetchFeedText(raw: string): Promise<{ text: string; fileName: string }> {
+export async function fetchFeedText(raw: string, apiKey?: string): Promise<{ text: string; fileName: string }> {
   const checked = checkFeedUrl(raw);
   if (!checked.ok) throw new Error(checked.error);
   const controller = new AbortController();
@@ -37,7 +37,10 @@ export async function fetchFeedText(raw: string): Promise<{ text: string; fileNa
     const res = await fetch(checked.url, {
       redirect: "error",
       signal: controller.signal,
-      headers: { Accept: "application/json, text/csv, text/plain" },
+      headers: {
+        Accept: "application/json, text/csv, text/plain",
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
     });
     if (!res.ok) throw new Error(`The link answered with an error (${res.status}).`);
     if (Number(res.headers.get("content-length") ?? 0) > MAX_BYTES) throw new Error("That file is too large.");

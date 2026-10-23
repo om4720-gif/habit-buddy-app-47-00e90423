@@ -179,6 +179,7 @@ export function GradesSection({ courses }: { courses: Course[] }) {
   const [importCourseId, setImportCourseId] = useState<string | null>(null);
   const [gradeFileOpen, setGradeFileOpen] = useState(false);
   const [feedUrl, setFeedUrl] = useState("");
+  const [feedKey, setFeedKey] = useState("");
   const connectFeedFn = useServerFn(connectGradeFeed);
   const disconnectFeedFn = useServerFn(disconnectGradeFeed);
   const feedStatusFn = useServerFn(getGradeFeedStatus);
@@ -730,14 +731,28 @@ export function GradesSection({ courses }: { courses: Course[] }) {
             <p className="mt-1 text-xs leading-relaxed text-ink-soft">
               Paste your grades link once. It's stored encrypted, checked every 3 hours, and new grades appear here and in the popup.
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 space-y-2">
               <input
                 value={feedUrl}
                 onChange={(e) => setFeedUrl(e.target.value)}
-                placeholder="https://…"
+                placeholder="https://…/api/public/v1/grades"
                 aria-label="Grades link"
-                className="min-w-0 flex-1 rounded-xl border border-line bg-background px-3 py-2 text-xs text-ink"
+                className="w-full rounded-xl border border-line bg-background px-3 py-2 text-xs text-ink"
               />
+              <input
+                type="password"
+                value={feedKey}
+                onChange={(e) => setFeedKey(e.target.value)}
+                placeholder="API key (from the app's API link page)"
+                aria-label="API key"
+                autoComplete="off"
+                className="w-full rounded-xl border border-line bg-background px-3 py-2 text-xs text-ink"
+              />
+              <p className="text-[11px] text-ink-soft">
+                Sent as <span className="font-mono">Authorization: Bearer &lt;key&gt;</span>. Stored encrypted.
+              </p>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
               <Button
                 type="button"
                 size="sm"
@@ -745,8 +760,9 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                 disabled={!feedUrl.trim()}
                 onClick={async () => {
                   try {
-                    const r = await connectFeedFn({ data: { url: feedUrl.trim() } });
+                    const r = await connectFeedFn({ data: { url: feedUrl.trim(), key: feedKey.trim() || undefined } });
                     setFeedUrl("");
+                    setFeedKey("");
                     toast.success(`Connected to ${r.host}`);
                     await refetchFeed();
                     await syncFeedFn().catch(() => undefined);

@@ -1,5 +1,16 @@
 import { decryptText } from "@/lib/feed-crypto.server";
 import { fetchFeedText } from "@/lib/feed-fetch.server";
+
+/** The encrypted value holds the link and, when the app needs one, its API key. Older rows hold only the link. */
+export function readStoredFeed(plain: string): { url: string; key?: string | undefined } {
+  try {
+    const parsed = JSON.parse(plain) as { url?: string; key?: string };
+    if (parsed.url) return { url: parsed.url, key: parsed.key };
+  } catch {
+    /* not JSON: an older row */
+  }
+  return { url: plain };
+}
 import { parseGradeFile } from "@/lib/grade-import";
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
@@ -16,8 +27,8 @@ export async function syncFeed(db: Db, row: FeedRow): Promise<{ updated: number;
   let updated = 0;
   let notified = 0;
   try {
-    const url = await decryptText(row.encrypted_url);
-    const { text, fileName } = await fetchFeedText(url);
+    const stored = readStoredFeed(await decryptText(row.encrypted_url));
+    const { text, fileName } = await fetchFeedText(stored.url, stored.key);
     const { grades } = parseGradeFile(text, fileName);
     if (grades.length === 0) throw new Error("the link didn't return any grades I could read");
 

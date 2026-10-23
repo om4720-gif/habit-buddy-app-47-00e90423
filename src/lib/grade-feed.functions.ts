@@ -10,12 +10,20 @@ import { MINUTE, limitUser } from "@/lib/rate-limit.server";
 /** Connects a grades link. It is encrypted before it is stored, and only its host is shown back. */
 export const connectGradeFeed = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data) => z.object({ url: z.string().min(10).max(2048) }).parse(data))
+  .validator((data) =>
+    z
+      .object({
+        url: z.string().min(10).max(2048),
+        key: z.string().max(500).optional(),
+      })
+      .parse(data),
+  )
   .handler(async ({ data, context }) => {
     limitUser(context.userId, "grade-feed-connect", [{ limit: 10, windowMs: MINUTE, label: "connect" }]);
     const checked = checkFeedUrl(data.url);
     if (!checked.ok) throw new Error(checked.error);
-    const encrypted = await encryptText(checked.url.toString());
+    const key = data.key?.trim() || undefined;
+    const encrypted = await encryptText(JSON.stringify({ url: checked.url.toString(), key }));
     const { error } = await context.supabase.from("grade_feeds").upsert(
       {
         user_id: context.userId,
