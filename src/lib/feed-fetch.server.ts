@@ -35,13 +35,14 @@ export async function fetchFeedText(raw: string, apiKey?: string): Promise<{ tex
   const timer = setTimeout(() => controller.abort(), 10_000);
   try {
     const res = await fetch(checked.url, {
-      redirect: "error",
+      redirect: "manual", // this runtime doesn't accept "error"; a redirect is refused below
       signal: controller.signal,
       headers: {
         Accept: "application/json, text/csv, text/plain",
         ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
       },
     });
+    if (res.status >= 300 && res.status < 400) throw new Error("The link redirects, which isn't allowed. Use the app's direct address.");
     if (!res.ok) throw new Error(`The link answered with an error (${res.status}).`);
     if (Number(res.headers.get("content-length") ?? 0) > MAX_BYTES) throw new Error("That file is too large.");
     const reader = res.body?.getReader();
