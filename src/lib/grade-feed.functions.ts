@@ -23,7 +23,12 @@ export const connectGradeFeed = createServerFn({ method: "POST" })
     const checked = checkFeedUrl(data.url);
     if (!checked.ok) throw new Error(checked.error);
     const key = data.key?.trim() || undefined;
-    const encrypted = await encryptText(JSON.stringify({ url: checked.url.toString(), key }));
+    let encrypted: string;
+    try {
+      encrypted = await encryptText(JSON.stringify({ url: checked.url.toString(), key }));
+    } catch (err) {
+      throw new Error(`Could not protect the link: ${err instanceof Error ? err.message : "unknown error"}`);
+    }
     const { error } = await context.supabase.from("grade_feeds").upsert(
       {
         user_id: context.userId,
@@ -34,7 +39,7 @@ export const connectGradeFeed = createServerFn({ method: "POST" })
       } as never,
       { onConflict: "user_id" },
     );
-    if (error) throw new Error("Could not save the link. Try again.");
+    if (error) throw new Error(`Could not save the link: ${error.message}`);
     return { host: checked.url.hostname };
   });
 
