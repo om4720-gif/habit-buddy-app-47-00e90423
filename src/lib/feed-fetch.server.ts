@@ -38,7 +38,8 @@ export async function fetchFeedText(raw: string, apiKey?: string): Promise<{ tex
       redirect: "manual", // this runtime doesn't accept "error"; a redirect is refused below
       signal: controller.signal,
       headers: {
-        Accept: "application/json, text/csv, text/plain",
+        // Browsers send text/html first; some apps refuse requests that don't accept HTML (406).
+        Accept: "text/html, application/json;q=0.9, text/csv;q=0.8, text/plain;q=0.7, */*;q=0.5",
         ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
       },
     });
