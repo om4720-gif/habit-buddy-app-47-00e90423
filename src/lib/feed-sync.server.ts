@@ -1,4 +1,4 @@
-import { matchCourse, matchItem } from "@/lib/course-match";
+import { matchCategory, matchCourse } from "@/lib/course-match";
 import { decryptText } from "@/lib/feed-crypto.server";
 import { fetchFeedText } from "@/lib/feed-fetch.server";
 import { parseGradeFile } from "@/lib/grade-import";
@@ -39,34 +39,41 @@ export async function syncFeed(db: Db, row: FeedRow): Promise<{ updated: number;
     const courseList = (courses ?? []) as { id: string; name: string; code: string | null }[];
     const courseIds = courseList.map((c) => c.id);
     const { data: items } = courseIds.length
-      ? await db.from("course_grade_items").select("id, course_id, title, score, max_score").in("course_id", courseIds)
+      ? await db.from("course_grade_items").select("id, course_id, title, score, max_score, marks").in("course_id", courseIds)
       : { data: [] };
-    const itemList = (items ?? []) as { id: string; course_id: string; title: string; score: number | null; max_score: number }[];
+    type Category = { id: string; course_id: string; title: string; score: number | null; max_score: number; marks: unknown };
+    const itemList = (items ?? []) as Category[];
 
     for (const g of grades) {
       const course = matchCourse(g.course, courseList);
       if (!course) continue;
-      const item = matchItem(g.title, itemList.filter((i) => i.course_id === course.id));
-      if (!item) continue;
-      if (Number(item.score) === g.score && Number(item.max_score) === g.max_score) continue;
+      // The feed's item goes into its category (Quizzes, Assignments...) as a mark, so the category's weight applies.
+      const category = matchCategory(g.title, itemList.filter((i) => i.course_id === course.id));
+      if (!category) continue;
+      const marks = Array.isArray(category.marks) ? (category.marks as { id: string; name: string; score: number | null; max_score: number; counts_for: string }[]) : [];
+      const markId = `feed-${g.title.toLowerCase().replace(/\s+/g, " ").trim()}`;
+      const existing = marks.find((m) => m.id === markId || m.name.toLowerCase() === g.title.toLowerCase());
+      if (existing && Number(existing.score) === g.score && Number(existing.max_score) === g.max_score) continue;
 
-      const wasEmpty = item.score === null;
+      const wasEmpty = !existing || existing.score === null;
+      const nextMarks = existing
+        ? marks.map((m) => (m === existing ? { ...m, score: g.score, max_score: g.max_score } : m))
+        : [...marks, { id: markId, name: g.title, score: g.score, max_score: g.max_score, counts_for: "here" }];
       const { error } = await db
         .from("course_grade_items")
-        .update({ score: g.score, max_score: g.max_score, updated_at: new Date().toISOString() })
-        .eq("id", item.id);
+        .update({ marks: nextMarks, updated_at: new Date().toISOString() })
+        .eq("id", category.id);
       if (error) throw new Error(error.message);
-      item.score = g.score;
-      item.max_score = g.max_score;
+      category.marks = nextMarks;
       updated++;
       if (wasEmpty) {
         await db.from("grade_notifications").insert({
           user_id: row.user_id,
           course_id: course.id,
-          grade_item_id: item.id,
+          grade_item_id: category.id,
           course_name: course.name,
           course_code: course.code,
-          grade_title: item.title,
+          grade_title: g.title,
           score: g.score,
           max_score: g.max_score,
         });

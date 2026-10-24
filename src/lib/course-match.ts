@@ -49,3 +49,28 @@ export function matchItem<T extends { title: string }>(feedTitle: string, items:
   });
   return inside.length === 1 ? inside[0]! : null;
 }
+
+// Feed item words -> the words a category name would use (e.g. "Quiz 1" belongs in "Quizzes").
+const CATEGORY_GROUPS: { feed: RegExp; category: RegExp }[] = [
+  { feed: /\b(quiz|quizzes|question|questions|in[ -]?class)\b/i, category: /quiz|in[ -]?class/i },
+  { feed: /\b(assignment|assignments|assign|ass|homework|hw)\b/i, category: /assign|homework|\bass\b/i },
+  { feed: /\b(mid[ -]?term|midterm)\b/i, category: /mid[ -]?term/i },
+  { feed: /\b(final|exam)\b/i, category: /final|exam/i },
+  { feed: /\bproject\b/i, category: /project/i },
+  { feed: /\b(lab|practical)\b/i, category: /lab|practical/i },
+  { feed: /\b(presentation|poster|report)\b/i, category: /presentation|poster|report/i },
+];
+
+/**
+ * Chooses the category (a weighted item such as "Quizzes" or "Assignments") that a feed item belongs to.
+ * Exact or near-exact names win first; otherwise the item's type (quiz, assignment, midterm...) is used.
+ * Returns null when it's unclear, so nothing is filed in the wrong place.
+ */
+export function matchCategory<T extends { title: string }>(feedTitle: string, categories: T[]): T | null {
+  const byName = matchItem(feedTitle, categories);
+  if (byName) return byName;
+  const hits = CATEGORY_GROUPS.filter((g) => g.feed.test(feedTitle));
+  if (hits.length !== 1) return null; // no clear type, or more than one
+  const candidates = categories.filter((c) => hits[0]!.category.test(c.title));
+  return candidates.length === 1 ? candidates[0]! : null;
+}
