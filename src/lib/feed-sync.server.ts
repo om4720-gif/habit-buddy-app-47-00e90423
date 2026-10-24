@@ -30,8 +30,11 @@ export async function syncFeed(db: Db, row: FeedRow): Promise<{ updated: number;
     const { text, fileName } = await fetchFeedText(stored.url, stored.key);
     const { grades } = parseGradeFile(text, fileName);
     if (grades.length === 0) {
+      // Show the page's title (never the content), so a sign-in or error page is easy to recognise.
+      const title = /<title[^>]*>([^<]{0,80})<\/title>/i.exec(text)?.[1]?.trim();
+      const kind = fileName === "feed.json" ? "JSON" : fileName === "feed.csv" ? "CSV" : "a web page";
       throw new Error(
-        `the link didn't return any grades I could read (it sent ${fileName === "feed.json" ? "JSON" : fileName === "feed.csv" ? "CSV" : "something else"}, ${text.length} characters)`,
+        `the link didn't return any grades I could read (it sent ${kind}, ${text.length} characters${title ? `, page title "${title}"` : ""})`,
       );
     }
 
