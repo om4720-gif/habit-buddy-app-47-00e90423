@@ -30,8 +30,15 @@ function editDistance(a: string, b: string): number {
       );
   return dp[a.length]![b.length]!;
 }
-const sameWord = (a: string, b: string) =>
-  a === b || (a.length >= 5 && b.length >= 5 && editDistance(a, b) <= 1);
+// Words match when they're equal, a one-letter typo apart, or share a long stem
+// ("structure" and "structural" both start with "structur").
+const sameWord = (a: string, b: string) => {
+  if (a === b) return true;
+  if (a.length >= 5 && b.length >= 5 && editDistance(a, b) <= 1) return true;
+  const shared = [...a].findIndex((ch, i) => ch !== b[i]);
+  const stem = shared === -1 ? Math.min(a.length, b.length) : shared;
+  return stem >= 6 && stem >= Math.min(a.length, b.length) - 2;
+};
 
 export type CourseRef = { id: string; name: string; code: string | null };
 
@@ -59,7 +66,10 @@ export function matchCourse<T extends CourseRef>(feedCourse: string, courses: T[
   // 3) Distinctive words of the course name found in the feed (allowing small typos).
   const scored = courses
     .map((c) => {
-      const ws = [...new Set(words(c.name).filter((w) => !FILLER.has(w) && !GENERIC.has(w) && w.length >= 3))];
+      const all = [...new Set(words(c.name).filter((w) => !FILLER.has(w) && w.length >= 3))];
+      // Prefer the distinctive words; generic ones only count when nothing else is left.
+      const distinctive = all.filter((w) => !GENERIC.has(w));
+      const ws = distinctive.length > 0 ? distinctive : all;
       if (ws.length === 0) return { c, score: 0 };
       const found = ws.filter((w) => titleWords.some((t) => sameWord(t, w))).length;
       return { c, score: found / ws.length };
