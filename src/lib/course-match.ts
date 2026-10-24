@@ -6,7 +6,9 @@ const GENERIC = new Set([
   "introduction", "intro", "to", "the", "and", "of", "for", "in", "course", "semester", "civil", "engineering",
   "engineer", "science", "sciences", "design", "principles", "system", "systems", "fundamentals", "advanced",
   "i", "ii", "iii", "iv", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+  "structures", "structure", "principles", "theory", "analysis",
 ]);
+const STOP = new Set(["of", "and", "the", "to", "in", "for", "on", "with", "a", "an", "i", "ii", "iii", "iv", "v"]);
 
 const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
 const words = (s: string) => norm(s).split(" ").filter((w) => w.length >= 3 && !GENERIC.has(w));
@@ -23,7 +25,19 @@ export function matchCourse<T extends CourseRef>(feedCourse: string, courses: T[
   const byCode = courses.filter((c) => c.code && padded.includes(` ${norm(c.code)} `));
   if (byCode.length === 1) return byCode[0]!;
 
-  // 2) Distinctive words of the course name that appear in the feed's text.
+  // 2) An abbreviation the user typed ("RC") matches the first letters of the feed's course name
+  //    ("Design of Reinforced Concrete Structures I" -> "RC"), ignoring filler words.
+  const titleWords = text
+    .split(" ")
+    .filter((w) => w.length > 0 && !/\d/.test(w) && !STOP.has(w) && w !== "civil" && w !== "engineering" && w !== "semester");
+  const coreAcronym = titleWords.filter((w) => !GENERIC.has(w)).map((w) => w[0]).join("");
+  const byAcronym = courses.filter((c) => {
+    const abbr = norm(c.name).replace(/\s+/g, "");
+    return /^[a-z]{2,6}$/.test(abbr) && abbr === coreAcronym;
+  });
+  if (byAcronym.length === 1) return byAcronym[0]!;
+
+  // 3) Distinctive words of the course name that appear in the feed's text.
   const scored = courses
     .map((c) => {
       const ws = [...new Set(words(c.name))];
