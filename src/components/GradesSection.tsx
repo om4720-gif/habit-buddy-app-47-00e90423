@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ImportGrades } from "@/components/ImportGrades";
 import { UnsortedGrades, type UnsortedRow } from "@/components/UnsortedGrades";
+import { ScrollPad } from "@/components/ScrollPad";
 import { WeightsImport } from "@/components/WeightsImport";
 import { checkWeights, type WeightRow } from "@/lib/weights";
 import { Input } from "@/components/ui/input";
@@ -864,36 +865,6 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                     </div>
                   )}
 
-                  {(() => {
-                    // What you need on the final itself. The rest of the unmarked work is assumed to
-                    // come in at your current average, so the number changes as you mark more items.
-                    const finalItem = items.find((item) => item.is_final && item.score === null);
-                    if (!finalItem || average === null || remaining <= 0) return null;
-                    const restWeight = Math.max(0, remaining - finalItem.weight);
-                    const assumedRest = (average / 100) * restWeight;
-                    return (
-                      <div className="mt-3 rounded-xl bg-cream/60 px-3 py-2">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-soft">
-                          Needed on the final ({percent(finalItem.weight)})
-                        </p>
-                        <div className="mt-1.5 flex flex-wrap gap-2">
-                          {bands.slice(0, 3).map(({ label, minimum }) => {
-                            const need = ((minimum - earned - assumedRest) / finalItem.weight) * 100;
-                            const value =
-                              need <= 0 ? "Already there" : need > 100 ? "Not possible" : `needs ${percent(need)}`;
-                            return (
-                              <span key={label} className="rounded-full bg-card px-3 py-1 text-xs font-semibold text-ink ring-1 ring-line">
-                                {label} {value}
-                              </span>
-                            );
-                          })}
-                        </div>
-                        <p className="mt-1.5 text-[11px] text-ink-soft">
-                          Assumes the other {percent(restWeight)} still to come lands at your current {percent(average)} average.
-                        </p>
-                      </div>
-                    );
-                  })()}
 
                   <UnsortedGrades
               rows={(unsortedRows as UnsortedRow[]).filter((row) => row.course_id === course.id)}
@@ -1129,7 +1100,8 @@ export function GradesSection({ courses }: { courses: Course[] }) {
       </Dialog>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="rounded-2xl border-line bg-card">
+        <DialogContent className="max-h-[85vh] overflow-y-auto rounded-2xl border-line bg-card">
+          <ScrollPad />
           <DialogHeader>
             <DialogTitle className="font-display text-xl text-ink">
               {editingItem ? "Edit component" : "Add assessment component"}

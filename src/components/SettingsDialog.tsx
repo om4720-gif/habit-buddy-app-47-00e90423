@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Monitor, Moon, Sun } from "lucide-react";
 
 import { ConnectedGradeLink } from "@/components/ConnectedGradeLink";
+import { ScrollPad } from "@/components/ScrollPad";
 import { OPEN_TOUR_EVENT } from "@/components/WelcomeTour";
 import { setColorMode, useColorMode, type ColorMode } from "@/lib/customize";
 import {
@@ -54,7 +55,8 @@ export function SettingsDialog() {
         Settings
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
+<ScrollPad />
           <DialogHeader>
             <DialogTitle>Personalize</DialogTitle>
           </DialogHeader>
