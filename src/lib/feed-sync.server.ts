@@ -47,12 +47,20 @@ export async function syncFeed(db: Db, row: FeedRow): Promise<{ updated: number;
     type Category = { id: string; course_id: string; title: string; score: number | null; max_score: number; marks: unknown };
     const itemList = (items ?? []) as Category[];
 
+    let matchedCourse = 0;
+    let matchedCategory = 0;
+    const unmatchedCourses = new Set<string>();
     for (const g of grades) {
       const course = matchCourse(g.course, courseList);
-      if (!course) continue;
+      if (!course) {
+        unmatchedCourses.add(g.course);
+        continue;
+      }
+      matchedCourse++;
       // The feed's item goes into its category (Quizzes, Assignments...) as a mark, so the category's weight applies.
       const category = matchCategory(g.title, itemList.filter((i) => i.course_id === course.id));
       if (!category) continue;
+      matchedCategory++;
       const marks = Array.isArray(category.marks) ? (category.marks as { id: string; name: string; score: number | null; max_score: number; counts_for: string }[]) : [];
       const markId = `feed-${g.title.toLowerCase().replace(/\s+/g, " ").trim()}`;
       const existing = marks.find((m) => m.id === markId || m.name.toLowerCase() === g.title.toLowerCase());
@@ -83,7 +91,9 @@ export async function syncFeed(db: Db, row: FeedRow): Promise<{ updated: number;
         notified++;
       }
     }
-    status = `ok: ${updated} updated${notified ? `, ${notified} new` : ""}`;
+    const detail = `read ${grades.length}, course matched ${matchedCourse}, category matched ${matchedCategory}`;
+    const unknown = unmatchedCourses.size ? `; no course for: ${[...unmatchedCourses].slice(0, 2).join(" | ")}` : "";
+    status = `ok: ${updated} updated${notified ? `, ${notified} new` : ""} (${detail}${unknown})`;
   } catch (err) {
     status = `error: ${err instanceof Error ? err.message : "unknown error"}`.slice(0, 200);
   }
