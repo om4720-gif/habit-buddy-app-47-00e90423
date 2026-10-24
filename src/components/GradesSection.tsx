@@ -197,6 +197,25 @@ export function GradesSection({ courses }: { courses: Course[] }) {
     retry: false,
   });
 
+  // Check the connected link when the Grades page opens (at most every 10 minutes), so new grades
+  // appear without pressing Check now.
+  useEffect(() => {
+    if (!feed) return;
+    const last = feed.last_checked_at ? new Date(feed.last_checked_at).getTime() : 0;
+    if (Date.now() - last < 10 * 60_000) return;
+    void (async () => {
+      try {
+        await syncFeedFn();
+      } catch {
+        /* the status on the card shows any problem */
+      }
+      await refetchFeed();
+      await queryClient.invalidateQueries({ queryKey: ["grade-items"] });
+      await queryClient.invalidateQueries({ queryKey: ["unsorted-grades"] });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feed?.last_checked_at]);
+
   const queryClient = useQueryClient();
   const fetchItems = useServerFn(getGradeItems);
   const fetchSettings = useServerFn(getCourseGradeSettings);
