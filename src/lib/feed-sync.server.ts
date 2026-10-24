@@ -30,7 +30,9 @@ export async function syncFeed(db: Db, row: FeedRow): Promise<{ updated: number;
     const stored = readStoredFeed(await decryptText(row.encrypted_url));
     const { text, fileName } = await fetchFeedText(stored.url, stored.key);
     const { grades } = parseGradeFile(text, fileName);
-    if (grades.length === 0) throw new Error("the link didn't return any grades I could read");
+    if (grades.length === 0) {
+      throw new Error(`the link didn't return any grades I could read (it sent ${fileName === "feed.json" ? "JSON" : fileName === "feed.csv" ? "CSV" : "something else"}, ${text.length} characters)`);
+    }
 
     const { data: courses } = await db.from("courses").select("id, name, code").eq("user_id", row.user_id);
     const courseIds = (courses ?? []).map((c: { id: string }) => c.id);

@@ -39,7 +39,8 @@ export async function fetchFeedText(raw: string, apiKey?: string): Promise<{ tex
       signal: controller.signal,
       headers: {
         // Browsers send text/html first; some apps refuse requests that don't accept HTML (406).
-        Accept: "text/html, application/json;q=0.9, text/csv;q=0.8, text/plain;q=0.7, */*;q=0.5",
+        // Same as a browser fetch(): the grades app answers JSON to */* but HTML when HTML is preferred.
+        Accept: "*/*",
         ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
       },
     });
