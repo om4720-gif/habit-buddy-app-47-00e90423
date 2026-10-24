@@ -12,7 +12,7 @@ export function WebhookSetup() {
   const createFn = useServerFn(createGradeWebhook);
   const { data: hook, refetch } = useQuery({ queryKey: ["grade-webhook"], queryFn: () => statusFn(), retry: false });
   const [token, setToken] = useState<string | null>(null);
-  const url = typeof window !== "undefined" ? `${window.location.origin}/api/public/grade-webhook` : "";
+  const url = typeof window !== "undefined" ? `${window.location.origin}/api/public/grades` : "";
 
   async function create() {
     if (hook && !window.confirm("Create a new secret? The old one stops working right away.")) return;

@@ -50,6 +50,12 @@ export const Route = createFileRoute("/api/public/grades")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // A grades-app webhook sends its secret as "Authorization: Bearer <64 hex characters>".
+        const webhookSecret = request.headers.get("authorization")?.match(/^Bearer\s+([a-f0-9]{64})$/i)?.[1];
+        if (webhookSecret) {
+          const { handleGradeWebhook } = await import("@/lib/grade-webhook.server");
+          return handleGradeWebhook(request, webhookSecret);
+        }
         const ip = clientIp(request);
         if (!checkLimit(`grade-inbox:ip:${ip}`, 20, 60_000).ok)
           return json(429, { error: "Too many requests." }, { "Retry-After": "60" });
