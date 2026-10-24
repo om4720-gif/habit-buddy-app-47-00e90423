@@ -10,8 +10,6 @@ import {
   syncGradeFeedNow,
 } from "@/lib/grade-feed.functions";
 import {
-  getGradeInboxToken,
-  resetGradeInboxToken,
   createGradeItem,
   deleteGradeItem,
   getCourseGradeSettings,
@@ -202,19 +200,6 @@ export function GradesSection({ courses }: { courses: Course[] }) {
     queryKey: ["grade-items"],
     queryFn: () => fetchItems({ data: {} }),
   });
-  const fetchInbox = useServerFn(getGradeInboxToken);
-  const resetInbox = useServerFn(resetGradeInboxToken);
-  const {
-    data: inbox,
-    refetch: refetchInbox,
-    isError: inboxError,
-    error: inboxErr,
-  } = useQuery({
-    queryKey: ["grade-inbox-token"],
-    queryFn: () => fetchInbox(),
-    retry: false, // show the problem now instead of spinning through slow retries
-  });
-  const inboxLink = inbox ? `${window.location.origin}/api/public/grades?key=${inbox.token}` : "";
   const { data: remoteSettings } = useQuery({
     queryKey: ["grade-settings"],
     queryFn: () => fetchSettings({ data: {} }),
@@ -802,86 +787,6 @@ export function GradesSection({ courses }: { courses: Course[] }) {
           );
         }}
       />
-
-      <div className="rounded-2xl border border-line bg-card p-4">
-        <p className="text-sm font-semibold text-ink">Grade inbox link</p>
-        {inboxError && (
-          <p className="mt-1 text-xs text-destructive">
-            {inboxErr instanceof Error ? inboxErr.message : "Could not load the link."} Reload the page, or check that the
-            latest database migration is applied.
-          </p>
-        )}
-        <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-          The Chrome extension sends new GUC grades to this link. Keep it private: anyone with it can add grades to your account.
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <input
-            readOnly
-            value={inboxLink}
-            placeholder={inboxError ? "Could not load the link" : "Loading…"}
-            aria-label="Grade inbox link"
-            onFocus={(e) => e.currentTarget.select()}
-            className="min-w-0 flex-1 rounded-xl border border-line bg-background px-3 py-2 text-xs text-ink"
-          />
-          <Button
-            type="button"
-            size="sm"
-            className="rounded-full"
-            disabled={!inboxLink}
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(inboxLink);
-                toast.success("Inbox link copied");
-              } catch {
-                toast.message(inboxLink);
-              }
-            }}
-          >
-            Copy
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="rounded-full"
-            onClick={async () => {
-              if (!window.confirm("Reset the link? The old one stops working right away, so update the extension.")) return;
-              try {
-                await resetInbox();
-                await refetchInbox();
-                toast.success("New link created. Paste it into the extension.");
-              } catch {
-                toast.error("Could not reset the link");
-              }
-            }}
-          >
-            Reset
-          </Button>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-line bg-card p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-ink">Get grades from GUC</p>
-            <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-              Sign in on GUC’s website. Habit Buddy does not collect or save your GUC password;
-              enter your grades here manually for now.
-            </p>
-          </div>
-          <a
-            href="https://apps.guc.edu.eg/student_ext/Grade/CheckGrade_01.aspx"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full bg-rust px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-rust/90"
-          >
-            Open GUC Grades
-          </a>
-        </div>
-        <p className="mt-3 border-t border-line pt-3 text-xs leading-relaxed text-ink-soft">
-          Your grade tracker is saved in this browser and is not synced to other devices.
-        </p>
-      </div>
 
       {courses.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-line bg-card p-8 text-center">
