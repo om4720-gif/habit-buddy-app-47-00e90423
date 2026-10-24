@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ImportGrades } from "@/components/ImportGrades";
 import { UnsortedGrades, type UnsortedRow } from "@/components/UnsortedGrades";
 import { ScrollPad } from "@/components/ScrollPad";
+import { gradeColor } from "@/lib/grade-colors";
 import { WeightsImport } from "@/components/WeightsImport";
 import { checkWeights, type WeightRow } from "@/lib/weights";
 import { Input } from "@/components/ui/input";
@@ -784,7 +785,7 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                           {average === null ? "—" : percent(average)}
                         </p>
                         {letter && (
-                          <p className="text-xs font-semibold text-ink-soft">
+                          <p className="text-xs font-semibold" style={{ color: gradeColor(letter) }}>
                             {letter}
                             {points !== null ? ` · ${points.toFixed(2)}` : ""}
                           </p>
