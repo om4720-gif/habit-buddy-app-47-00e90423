@@ -85,3 +85,69 @@ export function checkWeights(rows: WeightRow[], existing: { weight: number; is_f
     return "A course can only have one final exam component.";
   return null;
 }
+
+// ---- Several courses in one paste -------------------------------------------------------
+
+export type SchemeBlock = {
+  header: string; // the course line, e.g. "CIS 503 | Design of Reinforced Concrete Structures I"
+  creditHours: number | null;
+  rows: WeightRow[];
+  skipped: string[];
+};
+
+const IMAGE_LABEL = /^(png|jpe?g|gif|webp|image|photo|screenshot)$/i;
+
+/** One weighted line: strips bullets, keeps "best N out of M", and ignores bracketed notes. */
+function parseSchemeLine(raw: string): WeightRow | null {
+  let line = EN_DIGITS(raw).replace(/^\s*[*•\-–]+\s*/, "").replace(/\s+/g, " ").trim();
+  if (!line) return null;
+  let bestCount: number | null = null;
+  let expectedCount: number | null = null;
+  const best = /\bbest\s+(\d+)\s+out\s+of\s+(\d+)\b/i.exec(line);
+  if (best) {
+    bestCount = Number(best[1]);
+    expectedCount = Number(best[2]);
+  }
+  // Notes in brackets are commentary: remove them before reading the title and weight.
+  line = line.replace(/\([^()]*\)/g, " ").replace(/\s+/g, " ").trim();
+  const row = parseItem(line);
+  if (!row) return null;
+  if (bestCount !== null) return { ...row, bestCount, expectedCount };
+  return row;
+}
+
+/**
+ * Splits a pasted scheme that covers several courses into one block per course.
+ * A course line ends with a colon and mentions credit hours; the weights under it belong to it.
+ */
+export function parseSchemeBlocks(text: string): SchemeBlock[] {
+  const blocks: SchemeBlock[] = [];
+  const open = (header: string, creditHours: number | null): SchemeBlock => {
+    const block: SchemeBlock = { header, creditHours, rows: [], skipped: [] };
+    blocks.push(block);
+    return block;
+  };
+  let current: SchemeBlock | undefined;
+  for (const raw of text.split(/\r?\n/)) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const plain = trimmed.replace(/^[*•\-–\s]+/, "").trim();
+    if (IMAGE_LABEL.test(plain)) continue; // "PNG", "JPG": leftovers from copying images
+
+    const looksLikeHeader = /credit/i.test(plain) && !/%/.test(plain);
+    if (looksLikeHeader) {
+      const credits = /(\d+(?:\.\d+)?)\s*(?:credit hours?|credits?|CH)\b/i.exec(EN_DIGITS(plain));
+      const header = EN_DIGITS(plain)
+        .replace(/\(\s*\d+(?:\.\d+)?\s*(?:credit hours?|credits?|CH)\s*\)/i, "")
+        .replace(/[:\s]+$/, "")
+        .trim();
+      current = open(header, credits ? Number(credits[1]) : null);
+      continue;
+    }
+    if (!current) current = open("", null);
+    const row = parseSchemeLine(trimmed);
+    if (row) current.rows.push(row);
+    else current.skipped.push(trimmed);
+  }
+  return blocks.filter((b) => b.rows.length > 0 || b.header);
+}

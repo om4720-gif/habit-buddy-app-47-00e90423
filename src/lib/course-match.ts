@@ -42,7 +42,9 @@ export function matchCourse<T extends CourseRef>(feedCourse: string, courses: T[
   const padded = ` ${text} `;
 
   // 1) Course code written in the feed (e.g. CIG502).
-  const byCode = courses.filter((c) => c.code && padded.includes(` ${norm(c.code)} `));
+  // Codes are compared without spaces, so "CIS 501" and "CIS501" are the same code.
+  const squeezed = text.replace(/\s+/g, "");
+  const byCode = courses.filter((c) => c.code && squeezed.includes(norm(c.code).replace(/\s+/g, "")));
   if (byCode.length === 1) return byCode[0]!;
 
   // 2) Abbreviation (e.g. "RC") = first letters of the feed's main words.
