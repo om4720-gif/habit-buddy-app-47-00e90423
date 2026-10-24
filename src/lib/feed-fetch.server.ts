@@ -43,7 +43,20 @@ export async function fetchFeedText(raw: string, apiKey?: string): Promise<{ tex
       },
     });
     if (res.status >= 300 && res.status < 400) throw new Error("The link redirects, which isn't allowed. Use the app's direct address.");
-    if (!res.ok) throw new Error(`The link answered with an error (${res.status}).`);
+    if (!res.ok) {
+      // Show the API's own reason (its JSON "error" field) when it sends one.
+      let reason = "";
+      try {
+        const body = (await res.text()).slice(0, 500);
+        const parsed = JSON.parse(body) as { error?: unknown; message?: unknown };
+        const detail = parsed.error ?? parsed.message;
+        if (typeof detail === "string") reason = detail;
+        else if (detail && typeof detail === "object" && "message" in detail) reason = String((detail as { message: unknown }).message);
+      } catch {
+        /* not JSON: keep only the status */
+      }
+      throw new Error(`The link answered with an error (${res.status})${reason ? `: ${reason}` : "."}`);
+    }
     if (Number(res.headers.get("content-length") ?? 0) > MAX_BYTES) throw new Error("That file is too large.");
     const reader = res.body?.getReader();
     if (!reader) throw new Error("The link returned nothing.");
