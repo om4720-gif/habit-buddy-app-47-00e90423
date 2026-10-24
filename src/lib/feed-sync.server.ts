@@ -48,6 +48,7 @@ export async function syncFeed(db: Db, row: FeedRow): Promise<{ updated: number;
     const itemList = (items ?? []) as Category[];
 
     let matchedCourse = 0;
+    const courseMap = new Map<string, string>(); // feed course -> the app course it went to
     let matchedCategory = 0;
     const unmatchedCourses = new Set<string>();
     const unmatchedItems = new Map<string, number>();
@@ -58,6 +59,7 @@ export async function syncFeed(db: Db, row: FeedRow): Promise<{ updated: number;
         continue;
       }
       matchedCourse++;
+      if (!courseMap.has(g.course)) courseMap.set(g.course, course.name);
       // The feed's item goes into its category (Quizzes, Assignments...) as a mark, so the category's weight applies.
       const category = matchCategory(g.title, itemList.filter((i) => i.course_id === course.id));
       if (!category) {
@@ -104,7 +106,9 @@ export async function syncFeed(db: Db, row: FeedRow): Promise<{ updated: number;
         notified++;
       }
     }
-    const detail = `read ${grades.length}, course matched ${matchedCourse}, category matched ${matchedCategory}`;
+    const shortFeed = (c: string) => c.replace(/^civil engineering\s*(\d+\w*\s*semester)?\s*[-|]?\s*/i, "").slice(0, 40);
+    const pairs = [...courseMap.entries()].map(([f, a]) => `${shortFeed(f)} -> ${a}`).join("; ");
+    const detail = `read ${grades.length}, course matched ${matchedCourse}, category matched ${matchedCategory}${pairs ? `; courses: ${pairs}` : ""}`;
     const unknown = unmatchedCourses.size ? `; no course for: ${[...unmatchedCourses].slice(0, 2).join(" | ")}` : "";
     const noCategory = unmatchedItems.size ? `; no category for: ${[...unmatchedItems.keys()].slice(0, 2).join(" | ")}` : "";
     status = `ok: ${updated} updated${notified ? `, ${notified} new` : ""} (${detail}${unknown}${noCategory})`;
