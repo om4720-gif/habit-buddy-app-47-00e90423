@@ -22,7 +22,7 @@ export function GradePopup() {
   const { data: notes = [] } = useQuery({
     queryKey: ["grade-notifications"],
     queryFn: () => fetchUnread(),
-    refetchInterval: 5 * 60_000, // check every 5 minutes while the app is open
+    refetchInterval: 60_000, // check every minute while the app is open
     refetchOnWindowFocus: true,
   });
   const [shown, setShown] = useState<Note | null>(null);
