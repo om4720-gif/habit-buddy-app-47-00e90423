@@ -9,6 +9,7 @@ import {
 
 import { supabase } from "@/integrations/supabase/client";
 import { MeroFloating } from "@/components/MeroFloating";
+import { NotificationBell } from "@/components/NotificationBell";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { GradePopup } from "@/components/GradePopup";
 import { ThemeApplier } from "@/components/ThemeApplier";
@@ -67,6 +68,7 @@ function AppLayout() {
                 label={item.to === "/german" ? settings.habit_page_name : item.label}
               />
             ))}
+            <NotificationBell />
             <SettingsDialog />
             <SignOut />
           </div>

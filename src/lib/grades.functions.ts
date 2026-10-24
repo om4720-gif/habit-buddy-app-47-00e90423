@@ -240,3 +240,28 @@ export const resetGradeInboxToken = createServerFn({ method: "POST" })
     if (error) throw new Error("Could not create a new grade inbox link");
     return { token: data.token };
   });
+
+/** Recent grade alerts (read and unread), newest first, for the bell panel. */
+export const listGradeNotifications = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("grade_notifications")
+      .select("id, course_name, course_code, grade_title, score, max_score, received_at, read_at")
+      .order("received_at", { ascending: false })
+      .limit(50);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+/** Marks every unread grade alert as read. */
+export const markAllGradeNotificationsRead = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { error } = await context.supabase
+      .from("grade_notifications")
+      .update({ read_at: new Date().toISOString() })
+      .is("read_at", null);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  });
