@@ -271,6 +271,12 @@ export type Database = {
         Update: { course_id?: string; created_at?: string; id?: string; max_score?: number; score?: number; title?: string; user_id?: string }
         Relationships: []
       }
+      grade_webhooks: {
+        Row: { created_at: string; token_hash: string; user_id: string }
+        Insert: { created_at?: string; token_hash: string; user_id: string }
+        Update: { created_at?: string; token_hash?: string; user_id?: string }
+        Relationships: []
+      }
       grade_notifications: {
         Row: {
           course_code: string | null;
