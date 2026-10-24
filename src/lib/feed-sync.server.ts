@@ -61,11 +61,18 @@ export async function syncFeed(db: Db, row: FeedRow): Promise<{ updated: number;
       // The feed's item goes into its category (Quizzes, Assignments...) as a mark, so the category's weight applies.
       const category = matchCategory(g.title, itemList.filter((i) => i.course_id === course.id));
       if (!category) {
+        // Not sure which category it belongs to: hold it under the course so the owner can assign it.
         const cats = itemList.filter((i) => i.course_id === course.id).map((i) => i.title).join(", ") || "none";
         const key = `"${g.title}" in ${course.name} (categories: ${cats})`;
         unmatchedItems.set(key, (unmatchedItems.get(key) ?? 0) + 1);
+        await db.from("unsorted_grades").upsert(
+          { user_id: row.user_id, course_id: course.id, title: g.title.slice(0, 200), score: g.score, max_score: g.max_score },
+          { onConflict: "course_id,title" },
+        );
         continue;
       }
+      // Placed in a category: clear any held copy of it.
+      await db.from("unsorted_grades").delete().eq("course_id", course.id).eq("title", g.title.slice(0, 200));
       matchedCategory++;
       const marks = Array.isArray(category.marks) ? (category.marks as { id: string; name: string; score: number | null; max_score: number; counts_for: string }[]) : [];
       const markId = `feed-${g.title.toLowerCase().replace(/\s+/g, " ").trim()}`;

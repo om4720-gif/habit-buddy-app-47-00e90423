@@ -77,3 +77,24 @@ export const syncGradeFeedNow = createServerFn({ method: "POST" })
     const result = await syncFeed(db as never, feed);
     return { status: result.status, updated: result.updated, notified: result.notified };
   });
+
+export const listUnsortedGrades = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("unsorted_grades")
+      .select("id, course_id, title, score, max_score")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: true });
+    if (error) throw new Error("Could not load unsorted grades.");
+    return data ?? [];
+  });
+
+export const removeUnsortedGrade = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data) => z.object({ id: z.string().uuid() }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("unsorted_grades").delete().eq("id", data.id);
+    if (error) throw new Error("Could not remove that grade.");
+    return { ok: true };
+  });

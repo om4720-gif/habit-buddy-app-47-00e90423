@@ -265,6 +265,12 @@ export type Database = {
         }
         Relationships: []
       }
+      unsorted_grades: {
+        Row: { course_id: string; created_at: string; id: string; max_score: number; score: number; title: string; user_id: string }
+        Insert: { course_id: string; created_at?: string; id?: string; max_score: number; score: number; title: string; user_id: string }
+        Update: { course_id?: string; created_at?: string; id?: string; max_score?: number; score?: number; title?: string; user_id?: string }
+        Relationships: []
+      }
       grade_notifications: {
         Row: {
           course_code: string | null;

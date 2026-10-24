@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
+  listUnsortedGrades,
+  removeUnsortedGrade,
   connectGradeFeed,
   disconnectGradeFeed,
   getGradeFeedStatus,
@@ -21,6 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ImportGrades } from "@/components/ImportGrades";
+import { UnsortedGrades, type UnsortedRow } from "@/components/UnsortedGrades";
 import { WeightsImport } from "@/components/WeightsImport";
 import { checkWeights, type WeightRow } from "@/lib/weights";
 import { Input } from "@/components/ui/input";
@@ -177,6 +180,12 @@ export function GradesSection({ courses }: { courses: Course[] }) {
   const [importCourseId, setImportCourseId] = useState<string | null>(null);
   const [gradeFileOpen, setGradeFileOpen] = useState(false);
   const [feedUrl, setFeedUrl] = useState("");
+  const listUnsortedFn = useServerFn(listUnsortedGrades);
+  const removeUnsortedFn = useServerFn(removeUnsortedGrade);
+  const { data: unsortedRows = [], refetch: refetchUnsorted } = useQuery({
+    queryKey: ["unsorted-grades"],
+    queryFn: () => listUnsortedFn(),
+  });
   const [feedKey, setFeedKey] = useState("");
   const connectFeedFn = useServerFn(connectGradeFeed);
   const disconnectFeedFn = useServerFn(disconnectGradeFeed);
@@ -963,7 +972,33 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                     );
                   })()}
 
-                  <div className="mt-3 divide-y divide-line">
+                  <UnsortedGrades
+              rows={(unsortedRows as UnsortedRow[]).filter((row) => row.course_id === course.id)}
+              categories={items.map((item) => ({ id: item.id, title: item.title }))}
+              onAssign={async (row, categoryId) => {
+                const category = gradeItems.find((item) => item.id === categoryId);
+                if (!category) return;
+                const markId = `feed-${row.title.toLowerCase().replace(/\s+/g, " ").trim()}`;
+                const marks = category.marks ?? [];
+                const mark = { id: markId, name: row.title, score: row.score, max_score: row.max_score, counts_for: "here" };
+                const nextMarks = marks.some((m) => m.id === markId)
+                  ? marks.map((m) => (m.id === markId ? { ...m, ...mark } : m))
+                  : [...marks, mark];
+                persistLocalGrades(
+                  gradeItems.map((item) => (item.id === categoryId ? { ...item, marks: nextMarks } : item)),
+                  gradeSettings,
+                );
+                await removeUnsortedFn({ data: { id: row.id } });
+                await refetchUnsorted();
+                toast.success(`Added to ${category.title}`);
+              }}
+              onDismiss={async (row) => {
+                await removeUnsortedFn({ data: { id: row.id } });
+                await refetchUnsorted();
+              }}
+            />
+
+            <div className="mt-3 divide-y divide-line">
                     {items.map((item) => (
                       <button
                         key={item.id}
