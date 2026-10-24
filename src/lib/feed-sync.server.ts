@@ -50,6 +50,7 @@ export async function syncFeed(db: Db, row: FeedRow): Promise<{ updated: number;
     let matchedCourse = 0;
     let matchedCategory = 0;
     const unmatchedCourses = new Set<string>();
+    const unmatchedItems = new Map<string, number>();
     for (const g of grades) {
       const course = matchCourse(g.course, courseList);
       if (!course) {
@@ -59,7 +60,12 @@ export async function syncFeed(db: Db, row: FeedRow): Promise<{ updated: number;
       matchedCourse++;
       // The feed's item goes into its category (Quizzes, Assignments...) as a mark, so the category's weight applies.
       const category = matchCategory(g.title, itemList.filter((i) => i.course_id === course.id));
-      if (!category) continue;
+      if (!category) {
+        const cats = itemList.filter((i) => i.course_id === course.id).map((i) => i.title).join(", ") || "none";
+        const key = `"${g.title}" in ${course.name} (categories: ${cats})`;
+        unmatchedItems.set(key, (unmatchedItems.get(key) ?? 0) + 1);
+        continue;
+      }
       matchedCategory++;
       const marks = Array.isArray(category.marks) ? (category.marks as { id: string; name: string; score: number | null; max_score: number; counts_for: string }[]) : [];
       const markId = `feed-${g.title.toLowerCase().replace(/\s+/g, " ").trim()}`;
@@ -93,7 +99,8 @@ export async function syncFeed(db: Db, row: FeedRow): Promise<{ updated: number;
     }
     const detail = `read ${grades.length}, course matched ${matchedCourse}, category matched ${matchedCategory}`;
     const unknown = unmatchedCourses.size ? `; no course for: ${[...unmatchedCourses].slice(0, 2).join(" | ")}` : "";
-    status = `ok: ${updated} updated${notified ? `, ${notified} new` : ""} (${detail}${unknown})`;
+    const noCategory = unmatchedItems.size ? `; no category for: ${[...unmatchedItems.keys()].slice(0, 2).join(" | ")}` : "";
+    status = `ok: ${updated} updated${notified ? `, ${notified} new` : ""} (${detail}${unknown}${noCategory})`;
   } catch (err) {
     status = `error: ${err instanceof Error ? err.message : "unknown error"}`.slice(0, 200);
   }
