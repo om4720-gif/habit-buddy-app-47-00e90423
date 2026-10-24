@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Monitor, Moon, Sun } from "lucide-react";
 
+import { ConnectedGradeLink } from "@/components/ConnectedGradeLink";
 import { OPEN_TOUR_EVENT } from "@/components/WelcomeTour";
 import { setColorMode, useColorMode, type ColorMode } from "@/lib/customize";
 import {
@@ -129,6 +130,14 @@ export function SettingsDialog() {
               Replay the welcome tour
             </button>
           </form>
+
+          <div className="mt-2 border-t border-line pt-4">
+            <ConnectedGradeLink />
+          </div>
+
+          <div className="mt-2 border-t border-line pt-4">
+            <ConnectedGradeLink />
+          </div>
 
           <div className="mt-2 border-t border-line pt-4">
             <p className="text-sm font-medium text-ink">Your data</p>
