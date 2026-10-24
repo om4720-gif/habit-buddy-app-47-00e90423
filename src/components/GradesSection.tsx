@@ -25,7 +25,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ImportGrades } from "@/components/ImportGrades";
 import { UnsortedGrades, type UnsortedRow } from "@/components/UnsortedGrades";
 import { ScrollPad } from "@/components/ScrollPad";
-import { gradeColor } from "@/lib/grade-colors";
+import { courseColor, gradeColor, scaleColor } from "@/lib/grade-colors";
 import { WeightsImport } from "@/components/WeightsImport";
 import { checkWeights, type WeightRow } from "@/lib/weights";
 import { Input } from "@/components/ui/input";
@@ -781,7 +781,7 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                     </button>
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       <div className="text-right">
-                        <p className="text-xl font-bold text-ink">
+                        <p className="text-xl font-bold" style={{ color: scaleColor(average) }}>
                           {average === null ? "—" : percent(average)}
                         </p>
                         {letter && (
@@ -808,8 +808,8 @@ export function GradesSection({ courses }: { courses: Course[] }) {
 
                   <div className="mt-3 h-2 overflow-hidden rounded-full bg-cream">
                     <div
-                      className="h-full rounded-full bg-rust transition-all"
-                      style={{ width: `${Math.min(100, markedWeight)}%` }}
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${Math.min(100, markedWeight)}%`, backgroundColor: courseColor(course.id) }}
                     />
                   </div>
                   <p className="mt-1.5 text-xs text-ink-soft">

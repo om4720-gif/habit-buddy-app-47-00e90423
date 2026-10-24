@@ -29,7 +29,7 @@ export function ConnectedGradeLink() {
   return (
     <div className="space-y-3">
       <div className="rounded-2xl border border-line bg-card p-4">
-        <p className="text-sm font-semibold text-ink">Connected grades link</p>
+        <p className="text-sm font-semibold text-ink">If you are a GUC student, sync the grades now</p>
         {feed ? (
           <>
             <p className="mt-1 text-xs text-ink-soft">
@@ -58,7 +58,7 @@ export function ConnectedGradeLink() {
                   await queryClient.invalidateQueries({ queryKey: ["grade-items"] });
                 }}
               >
-                Check now
+                Sync grades now
               </Button>
               <Button
                 type="button"
