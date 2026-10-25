@@ -46,10 +46,8 @@ export const GRADES_APP_URL = "https://guc-grade-garden.lovable.app";
 /** Starts "Connect Grade Garden": a one-time request the grades app returns with its secret. */
 export const startGradeConnect = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data) => z.object({ origin: z.string().url().max(300) }).parse(data))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ context }) => {
     limitUser(context.userId, "grade-connect-start", [{ limit: 10, windowMs: MINUTE, label: "connect" }]);
-    if (!data.origin.startsWith("https://") && !data.origin.startsWith("http://localhost")) throw new Error("This site must use https.");
     const state = randomToken();
     const { error } = await context.supabase.from("grade_connect_states").insert({
       state_hash: await sha256Hex(state),
@@ -57,7 +55,7 @@ export const startGradeConnect = createServerFn({ method: "POST" })
       expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
     } as never);
     if (error) throw new Error(`Could not start the connection: ${error.message}`);
-    const back = `${data.origin}/uni?grades=connected`;
+    const back = "https://habit-buddy-app-47.lovable.app/uni?grades=connected";
     return {
       url: `${GRADES_APP_URL}/connect?state=${state}&return=${encodeURIComponent(back)}`,
     };
