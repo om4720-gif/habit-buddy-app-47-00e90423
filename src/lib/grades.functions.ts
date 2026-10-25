@@ -265,3 +265,25 @@ export const markAllGradeNotificationsRead = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { success: true };
   });
+
+/** Deletes one grade alert (only the signed-in student's own). */
+export const deleteGradeNotification = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data) => z.object({ id: z.string().uuid() }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("grade_notifications").delete().eq("id", data.id);
+    if (error) throw new Error("Could not delete that alert.");
+    return { success: true };
+  });
+
+/** Deletes every grade alert the signed-in student can see. */
+export const clearGradeNotifications = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { error } = await context.supabase
+      .from("grade_notifications")
+      .delete()
+      .gte("received_at", "1970-01-01T00:00:00Z");
+    if (error) throw new Error("Could not clear the alerts.");
+    return { success: true };
+  });
