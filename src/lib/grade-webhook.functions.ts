@@ -69,3 +69,50 @@ export const disconnectGradeApp = createServerFn({ method: "POST" })
     if (error) throw new Error("Could not disconnect. Try again.");
     return { ok: true };
   });
+
+
+/** Triggers a GUC sync from Ritual without exposing the server-side bearer hash to the browser. */
+export const syncGucGradesNow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: connection, error: lookupError } = await context.supabase
+      .from("grade_webhooks")
+      .select("token_hash")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (lookupError || !connection?.token_hash) {
+      throw new Error("GUC is not connected. Connect it again from Ritual.");
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 35_000);
+    let response: Response;
+    try {
+      response = await fetch(`${GRADES_APP_URL}/api/public/sync-now`, {
+        method: "POST",
+        redirect: "error",
+        signal: controller.signal,
+        headers: { Authorization: "Bearer " + connection.token_hash },
+      });
+    } catch {
+      throw new Error("Could not reach GradeWatch to check grades. Try again.");
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const payload = await response.json().catch(() => ({})) as {
+      error?: unknown;
+      ok?: unknown;
+      total?: unknown;
+      changed?: unknown;
+    };
+    if (!response.ok || payload.ok !== true) {
+      if (response.status === 401) throw new Error("The GUC connection expired. Reconnect from Ritual.");
+      throw new Error(typeof payload.error === "string" ? payload.error : "GUC could not check grades. Try again.");
+    }
+
+    return {
+      total: typeof payload.total === "number" ? payload.total : 0,
+      changed: typeof payload.changed === "number" ? payload.changed : 0,
+    };
+  });
