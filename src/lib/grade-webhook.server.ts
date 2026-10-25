@@ -44,10 +44,55 @@ export async function handleGradeWebhook(request: Request, secret: string): Prom
   }
 
   const applied = await applyGrades(db as never, hook.user_id, grades);
+
+  // Anything whose course isn't in Ritual is still shown in the bell, so every message is visible.
+  let shown = 0;
+  const unknown = grades.filter((g) => applied.unmatchedCourses.has(g.course));
+  if (unknown.length > 0) {
+    const { data: firstCourse } = await db.from("courses").select("id, code").eq("user_id", hook.user_id).limit(1).maybeSingle();
+    if (firstCourse) {
+      for (const g of unknown) {
+        const { error } = await db.from("grade_notifications").insert({
+          user_id: hook.user_id,
+          course_id: firstCourse.id,
+          grade_item_id: null,
+          course_name: g.course.slice(0, 200) || "Unknown course",
+          course_code: firstCourse.code,
+          grade_title: g.title.slice(0, 200),
+          score: g.score,
+          max_score: g.max_score,
+        });
+        if (error) return json(500, { error: `Could not save the alert: ${error.message}` });
+        shown++;
+      }
+    }
+  }
+
+  // Grades whose course isn't in Ritual still show in the bell, labelled with the course name sent,
+  // so a test (or a misnamed course) is visible instead of silently dropped.
+  const unmatched = grades.filter((g) => applied.unmatchedCourses.has(g.course));
+  if (unmatched.length > 0) {
+    const { data: anyCourse } = await db.from("courses").select("id, code").eq("user_id", hook.user_id).limit(1).maybeSingle();
+    if (anyCourse) {
+      for (const g of unmatched) {
+        await db.from("grade_notifications").insert({
+          user_id: hook.user_id,
+          course_id: anyCourse.id,
+          grade_item_id: null,
+          course_name: `${g.course} (not in Ritual)`.slice(0, 200),
+          course_code: anyCourse.code,
+          grade_title: g.title,
+          score: g.score,
+          max_score: g.max_score,
+        });
+      }
+    }
+  }
   return json(200, {
     received: grades.length,
     updated: applied.updated,
-    new_popups: applied.notified,
+    new_popups: applied.notified + shown,
     unmatched_courses: [...applied.unmatchedCourses],
+    shown_in_bell_as_unmatched: shown,
   });
 }
