@@ -78,6 +78,9 @@ export function ConnectedGradeLink() {
             <Button type="button" size="sm" className="rounded-full" onClick={() => void checkNow()} disabled={syncing}>
               {syncing ? "Checking GUC…" : "Check now"}
             </Button>
+            <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => void connect()} disabled={isPending}>
+              Reconnect GUC
+            </Button>
             <Button type="button" variant="ghost" size="sm" className="rounded-full" onClick={() => void disconnect()}>
               Disconnect
             </Button>
