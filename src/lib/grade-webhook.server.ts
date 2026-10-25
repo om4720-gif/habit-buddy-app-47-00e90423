@@ -29,7 +29,7 @@ export async function handleGradeWebhook(request: Request, secret: string): Prom
     const { data: firstCourse } = await db.from("courses").select("id, name, code").eq("user_id", hook.user_id).limit(1).maybeSingle();
     if (!firstCourse) return json(400, { error: "Add at least one course in Ritual first." });
     const label = String(fields["item"] ?? fields["title"] ?? fields["message"] ?? fields["event"] ?? "Test notification").slice(0, 200);
-    await db.from("grade_notifications").insert({
+    const { error: insertError } = await db.from("grade_notifications").insert({
       user_id: hook.user_id,
       course_id: firstCourse.id,
       grade_item_id: null,
@@ -39,6 +39,7 @@ export async function handleGradeWebhook(request: Request, secret: string): Prom
       score: 0,
       max_score: 0,
     });
+    if (insertError) return json(500, { error: `Could not save the alert: ${insertError.message}` });
     return json(200, { received: 0, test_notification: true, note: "Saved as a test alert in the bell." });
   }
 
