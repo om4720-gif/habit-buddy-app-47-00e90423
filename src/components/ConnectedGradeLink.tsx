@@ -1,5 +1,6 @@
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import {
   disconnectGradeApp,
   getGradeWebhookStatus,
   startGradeConnect,
+  syncGucGradesNow,
 } from "@/lib/grade-webhook.functions";
 
 /** Starts the one-time GUC login exchange without exposing either app's secret to the student. */
@@ -14,6 +16,8 @@ export function ConnectedGradeLink() {
   const statusFn = useServerFn(getGradeWebhookStatus);
   const connectFn = useServerFn(startGradeConnect);
   const disconnectFn = useServerFn(disconnectGradeApp);
+  const syncFn = useServerFn(syncGucGradesNow);
+  const [syncing, setSyncing] = useState(false);
   const { data: connection, isPending, refetch } = useQuery({
     queryKey: ["grade-webhook-status"],
     queryFn: () => statusFn(),
@@ -40,6 +44,19 @@ export function ConnectedGradeLink() {
     }
   }
 
+  async function checkNow() {
+    setSyncing(true);
+    try {
+      const result = await syncFn();
+      await refetch();
+      toast.success(`Check complete: ${result.total} grade items read, ${result.changed} changed.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not check GUC grades.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <div className="rounded-2xl border border-line bg-card p-4">
       <p className="text-sm font-semibold text-ink">Connect to Ritual</p>
@@ -57,9 +74,14 @@ export function ConnectedGradeLink() {
           {connection.last_result && (
             <p className="mt-1 text-xs text-ink-soft">Last result: {connection.last_result}</p>
           )}
-          <Button type="button" variant="ghost" size="sm" className="mt-3 rounded-full" onClick={() => void disconnect()}>
-            Disconnect
-          </Button>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" size="sm" className="rounded-full" onClick={() => void checkNow()} disabled={syncing}>
+              {syncing ? "Checking GUC…" : "Check now"}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" className="rounded-full" onClick={() => void disconnect()}>
+              Disconnect
+            </Button>
+          </div>
         </>
       ) : (
         <Button type="button" size="sm" className="mt-3 rounded-full" onClick={() => void connect()} disabled={isPending}>
