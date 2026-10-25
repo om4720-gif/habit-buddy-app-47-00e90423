@@ -84,20 +84,59 @@ export const syncGucGradesNow = createServerFn({ method: "POST" })
       throw new Error("GUC is not connected. Connect it again from Ritual.");
     }
 
+    const endpoint = `${GRADES_APP_URL}/api/public/sync-now`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 35_000);
     let response: Response;
     try {
-      response = await fetch(`${GRADES_APP_URL}/api/public/sync-now`, {
+      response = await fetch(endpoint, {
         method: "POST",
-        redirect: "error",
+        redirect: "manual",
         signal: controller.signal,
         headers: { Authorization: "Bearer " + connection.token_hash },
       });
-    } catch {
-      throw new Error("Could not reach GradeWatch to check grades. Try again.");
+    } catch (error) {
+      const cause = error && typeof error === "object" && "cause" in error
+        ? (error as { cause?: { code?: unknown } }).cause?.code
+        : undefined;
+      const detail = typeof cause === "string" ? cause : controller.signal.aborted ? "timeout" : "HTTPS request failed";
+      throw new Error("Could not reach GradeWatch (" + detail + "). Try again.");
     } finally {
       clearTimeout(timer);
+    }
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      let target: URL | null = null;
+      try {
+        target = location ? new URL(location, endpoint) : null;
+      } catch {
+        target = null;
+      }
+      const original = new URL(endpoint);
+      const safeRedirect =
+        target?.origin === original.origin &&
+        target.pathname === original.pathname &&
+        target.search === "" &&
+        target.hash === "";
+      if (!safeRedirect || (response.status !== 307 && response.status !== 308)) {
+        throw new Error("GradeWatch redirected the check request (HTTP " + response.status + ").");
+      }
+
+      const redirectedController = new AbortController();
+      const redirectedTimer = setTimeout(() => redirectedController.abort(), 35_000);
+      try {
+        response = await fetch(target.toString(), {
+          method: "POST",
+          redirect: "error",
+          signal: redirectedController.signal,
+          headers: { Authorization: "Bearer " + connection.token_hash },
+        });
+      } catch {
+        throw new Error("GradeWatch's redirected HTTPS check failed.");
+      } finally {
+        clearTimeout(redirectedTimer);
+      }
     }
 
     const payload = await response.json().catch(() => ({})) as {
