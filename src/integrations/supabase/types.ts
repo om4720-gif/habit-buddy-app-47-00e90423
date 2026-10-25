@@ -272,9 +272,9 @@ export type Database = {
         Relationships: []
       }
       grade_webhooks: {
-        Row: { created_at: string; token_hash: string; user_id: string }
-        Insert: { created_at?: string; token_hash: string; user_id: string }
-        Update: { created_at?: string; token_hash?: string; user_id?: string }
+        Row: { created_at: string; last_result: string | null; last_seen_at: string | null; token_hash: string; user_id: string }
+        Insert: { created_at?: string; last_result?: string | null; last_seen_at?: string | null; token_hash: string; user_id: string }
+        Update: { created_at?: string; last_result?: string | null; last_seen_at?: string | null; token_hash?: string; user_id?: string }
         Relationships: []
       }
       grade_notifications: {

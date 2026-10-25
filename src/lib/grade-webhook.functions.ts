@@ -33,7 +33,7 @@ export const getGradeWebhookStatus = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const { data } = await context.supabase
       .from("grade_webhooks")
-      .select("created_at")
+      .select("created_at, last_seen_at, last_result")
       .eq("user_id", context.userId)
       .maybeSingle();
     return data ?? null;

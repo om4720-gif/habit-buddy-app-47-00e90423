@@ -32,6 +32,7 @@ export function WebhookSetup() {
       <p className="text-xs text-ink-soft">
         Your grades app sends a message here when a new grade is posted. Ritual saves it and shows a popup.
         {hook ? ` Secret created ${new Date(hook.created_at).toLocaleString()}.` : " No secret yet."}
+        {hook?.last_seen_at ? ` Last message: ${new Date(hook.last_seen_at).toLocaleString()} → ${hook.last_result}.` : hook ? " No message received yet." : ""}
       </p>
       {token ? (
         <div className="space-y-2 rounded-xl bg-cream p-3">
