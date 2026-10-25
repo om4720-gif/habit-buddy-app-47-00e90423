@@ -97,7 +97,7 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-11 z-[70] w-[22rem] max-w-[92vw] overflow-hidden rounded-3xl border border-white/10 bg-zinc-950/85 text-zinc-100 shadow-[0_0_60px_-12px_rgba(16,185,129,0.45)] backdrop-blur-2xl">
+        <div className="absolute right-0 top-11 z-[70] w-[22rem] max-w-[92vw] overflow-hidden rounded-3xl border border-white/10 bg-zinc-950 text-zinc-100 shadow-[0_0_60px_-12px_rgba(16,185,129,0.45)]">
           <div className="pointer-events-none absolute inset-x-0 -top-24 h-48 bg-gradient-to-b from-emerald-500/25 to-transparent blur-2xl" />
           <div className="relative flex items-center justify-between px-5 pb-3 pt-4">
             <div>
