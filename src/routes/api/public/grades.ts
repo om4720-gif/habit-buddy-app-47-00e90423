@@ -1,4 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type",
+  "Access-Control-Max-Age": "600",
+};
 import { z } from "zod";
 
 import { checkLimit, clientIp } from "@/lib/rate-limit.server";
@@ -49,6 +56,14 @@ const json = (status: number, body: unknown, extra: Record<string, string> = {})
 export const Route = createFileRoute("/api/public/grades")({
   server: {
     handlers: {
+      // Browsers and monitoring tools check with GET first: answer with a status instead of a 404 page.
+      GET: async () =>
+        new Response(
+          JSON.stringify({ status: "ok", endpoint: "/api/public/grades", methods: ["POST"], auth: "Authorization: Bearer <webhook secret>" }),
+          { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...CORS } },
+        ),
+      // Cross-origin callers send an OPTIONS preflight before POST.
+      OPTIONS: async () => new Response(null, { status: 204, headers: CORS }),
       POST: async ({ request }) => {
         // A grades-app webhook sends its secret as "Authorization: Bearer <64 hex characters>".
         const webhookSecret = request.headers.get("authorization")?.match(/^Bearer\s+([a-f0-9]{64})$/i)?.[1];
