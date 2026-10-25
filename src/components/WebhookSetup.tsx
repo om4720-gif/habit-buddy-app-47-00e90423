@@ -14,7 +14,7 @@ export function WebhookSetup() {
 
   async function connect() {
     try {
-      const r = await startFn({ data: { origin: window.location.origin } });
+      const r = await startFn();
       window.location.href = r.url;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not start the connection");
