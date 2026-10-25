@@ -71,6 +71,20 @@ export const Route = createFileRoute("/api/public/grades")({
           const { handleGradeWebhook } = await import("@/lib/grade-webhook.server");
           return handleGradeWebhook(request, webhookSecret);
         }
+        // The grades app finishes "Connect" by sending the one-time state and its new secret (no Bearer header yet).
+        if (!request.headers.get("authorization")) {
+          const raw = await request.clone().text();
+          let parsed: { connect?: unknown; state?: unknown; secret?: unknown } = {};
+          try {
+            parsed = JSON.parse(raw) as typeof parsed;
+          } catch {
+            /* not JSON */
+          }
+          if (parsed.connect) {
+            const { handleGradeConnect } = await import("@/lib/grade-webhook.server");
+            return handleGradeConnect(parsed);
+          }
+        }
         const ip = clientIp(request);
         if (!checkLimit(`grade-inbox:ip:${ip}`, 20, 60_000).ok)
           return json(429, { error: "Too many requests." }, { "Retry-After": "60" });

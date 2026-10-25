@@ -81,3 +81,30 @@ export async function handleGradeWebhook(request: Request, secret: string): Prom
     shown_in_bell_as_unmatched: shown,
   });
 }
+
+/**
+ * The grades app finishes its GUC sign-in and calls this with the one-time state and the secret it created.
+ * Ritual checks the state, saves the secret for that user, and the app is connected.
+ */
+export async function handleGradeConnect(body: { state?: unknown; secret?: unknown }): Promise<Response> {
+  const json = (status: number, payload: unknown) =>
+    new Response(JSON.stringify(payload), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+  const state = typeof body.state === "string" ? body.state : "";
+  const secret = typeof body.secret === "string" ? body.secret : "";
+  if (!/^[a-f0-9]{64}$/.test(state) || !/^[a-f0-9]{64}$/.test(secret)) return json(400, { error: "Invalid request." });
+
+  const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
+  const { data: request } = await db
+    .from("grade_connect_states")
+    .select("user_id, expires_at")
+    .eq("state_hash", await sha256Hex(state))
+    .maybeSingle();
+  if (!request || new Date(request.expires_at).getTime() < Date.now()) return json(401, { error: "This connection request expired. Start again in Ritual." });
+
+  await db.from("grade_connect_states").delete().eq("state_hash", await sha256Hex(state));
+  const { error } = await db
+    .from("grade_webhooks")
+    .upsert({ user_id: request.user_id, token_hash: await sha256Hex(secret), created_at: new Date().toISOString() }, { onConflict: "user_id" });
+  if (error) return json(500, { error: `Could not save the connection: ${error.message}` });
+  return json(200, { ok: true, connected: true });
+}

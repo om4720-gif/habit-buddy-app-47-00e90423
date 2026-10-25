@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { z } from "zod";
 import { MINUTE, limitUser } from "@/lib/rate-limit.server";
 
 const randomToken = () => {
@@ -37,4 +38,36 @@ export const getGradeWebhookStatus = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .maybeSingle();
     return data ?? null;
+  });
+
+/** Address of the grades app that signs students in to GUC. */
+export const GRADES_APP_URL = "https://guc-grade-garden.lovable.app";
+
+/** Starts "Connect Grade Garden": a one-time request the grades app returns with its secret. */
+export const startGradeConnect = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data) => z.object({ origin: z.string().url().max(300) }).parse(data))
+  .handler(async ({ data, context }) => {
+    limitUser(context.userId, "grade-connect-start", [{ limit: 10, windowMs: MINUTE, label: "connect" }]);
+    if (!data.origin.startsWith("https://") && !data.origin.startsWith("http://localhost")) throw new Error("This site must use https.");
+    const state = randomToken();
+    const { error } = await context.supabase.from("grade_connect_states").insert({
+      state_hash: await sha256Hex(state),
+      user_id: context.userId,
+      expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
+    } as never);
+    if (error) throw new Error(`Could not start the connection: ${error.message}`);
+    const back = `${data.origin}/uni?grades=connected`;
+    return {
+      url: `${GRADES_APP_URL}/connect?state=${state}&return=${encodeURIComponent(back)}`,
+    };
+  });
+
+/** Disconnects the grades app: its secret stops working right away. */
+export const disconnectGradeApp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { error } = await context.supabase.from("grade_webhooks").delete().eq("user_id", context.userId);
+    if (error) throw new Error("Could not disconnect. Try again.");
+    return { ok: true };
   });

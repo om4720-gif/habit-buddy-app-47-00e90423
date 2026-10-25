@@ -277,6 +277,12 @@ export type Database = {
         Update: { created_at?: string; last_result?: string | null; last_seen_at?: string | null; token_hash?: string; user_id?: string }
         Relationships: []
       }
+      grade_connect_states: {
+        Row: { created_at: string; expires_at: string; state_hash: string; user_id: string }
+        Insert: { created_at?: string; expires_at: string; state_hash: string; user_id: string }
+        Update: { created_at?: string; expires_at?: string; state_hash?: string; user_id?: string }
+        Relationships: []
+      }
       grade_notifications: {
         Row: {
           course_code: string | null;
