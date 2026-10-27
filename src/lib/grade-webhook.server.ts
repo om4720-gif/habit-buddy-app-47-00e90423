@@ -1,6 +1,7 @@
 import { sha256Hex } from "@/lib/grade-webhook.functions";
 import { applyGrades } from "@/lib/feed-sync.server";
 import { parseGradeFile } from "@/lib/grade-import";
+import { sendGradePushNotifications } from "@/lib/grade-push.server";
 
 /** Handles a grades-app webhook: a secret in "Authorization: Bearer", and the grade as JSON. */
 export async function handleGradeWebhook(request: Request, secret: string): Promise<Response> {
@@ -13,7 +14,12 @@ export async function handleGradeWebhook(request: Request, secret: string): Prom
   const json = async (status: number, body: unknown) => {
     // Remember the last message, so Settings can show that it arrived and what happened.
     if (hook) {
-      const summary = (body as { error?: string; note?: string }).error ?? (body as { note?: string }).note ?? "ok";
+      const result = body as { error?: string; note?: string; received?: number; updated?: number };
+      const summary = result.error ?? result.note ?? (
+        typeof result.received === "number"
+          ? "received " + result.received + " grade(s)" + (typeof result.updated === "number" ? ", applied " + result.updated : "")
+          : "ok"
+      );
       await db
         .from("grade_webhooks")
         .update({ last_seen_at: new Date().toISOString(), last_result: `${status}: ${summary}`.slice(0, 200) })
@@ -73,12 +79,28 @@ export async function handleGradeWebhook(request: Request, secret: string): Prom
       }
     }
   }
+  let phonePush = { configured: false, sent: 0, failed: 0, expired: 0 };
+  try {
+    phonePush = await sendGradePushNotifications(db as never, hook.user_id);
+  } catch {
+    phonePush = { configured: true, sent: 0, failed: 1, expired: 0 };
+  }
+  const pushNote = !phonePush.configured
+    ? "Grade saved; phone alerts need VAPID keys in Lovable Cloud."
+    : phonePush.sent > 0
+      ? "Grade saved; phone alert sent to " + phonePush.sent + " device(s)."
+      : phonePush.failed > 0
+        ? "Grade saved; phone alert could not be sent."
+        : "Grade saved; enable phone alerts on a device to receive push notifications.";
+
   return json(200, {
     received: grades.length,
     updated: applied.updated,
     new_popups: applied.notified + shown,
     unmatched_courses: [...applied.unmatchedCourses],
     shown_in_bell_as_unmatched: shown,
+    phone_push: phonePush,
+    note: pushNote,
   });
 }
 
