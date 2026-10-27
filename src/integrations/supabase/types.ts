@@ -283,6 +283,12 @@ export type Database = {
         Update: { created_at?: string; expires_at?: string; state_hash?: string; user_id?: string }
         Relationships: []
       }
+      grade_push_subscriptions: {
+        Row: { created_at: string; endpoint: string; id: string; user_id: string }
+        Insert: { created_at?: string; endpoint: string; id?: string; user_id: string }
+        Update: { created_at?: string; endpoint?: string; id?: string; user_id?: string }
+        Relationships: []
+      }
       grade_notifications: {
         Row: {
           course_code: string | null;

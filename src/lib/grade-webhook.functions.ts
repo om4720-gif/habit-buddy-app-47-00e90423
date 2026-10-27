@@ -155,3 +155,44 @@ export const syncGucGradesNow = createServerFn({ method: "POST" })
       changed: typeof payload.changed === "number" ? payload.changed : 0,
     };
   });
+
+const gradePushEndpointSchema = z.object({
+  endpoint: z.string().url().max(4096).refine((value) => value.startsWith("https://"), "A secure HTTPS push endpoint is required."),
+});
+
+/** Returns the public VAPID key needed by the browser to create a push subscription. */
+export const getGradePushConfig = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => ({
+    publicKey: process.env["GRADE_PUSH_VAPID_PUBLIC_KEY"]?.trim() || null,
+  }));
+
+/** Saves this device's push endpoint in Ritual's Lovable Cloud Supabase database. */
+export const saveGradePushSubscription = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => gradePushEndpointSchema.parse(data))
+  .handler(async ({ context, data }) => {
+    limitUser(context.userId, "grade-push-subscribe", [{ limit: 10, windowMs: MINUTE, label: "push subscription" }]);
+    const { error } = await context.supabase
+      .from("grade_push_subscriptions")
+      .upsert(
+        { user_id: context.userId, endpoint: data.endpoint } as never,
+        { onConflict: "user_id,endpoint" },
+      );
+    if (error) throw new Error("Could not save this phone's notification subscription.");
+    return { ok: true };
+  });
+
+/** Removes only this device's push endpoint from the signed-in user's subscriptions. */
+export const removeGradePushSubscription = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => gradePushEndpointSchema.parse(data))
+  .handler(async ({ context, data }) => {
+    const { error } = await context.supabase
+      .from("grade_push_subscriptions")
+      .delete()
+      .eq("user_id", context.userId)
+      .eq("endpoint", data.endpoint);
+    if (error) throw new Error("Could not disable phone notifications on this device.");
+    return { ok: true };
+  });
