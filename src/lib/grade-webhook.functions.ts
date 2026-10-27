@@ -157,7 +157,7 @@ export const syncGucGradesNow = createServerFn({ method: "POST" })
   });
 
 const gradePushEndpointSchema = z.object({
-  endpoint: z.string().url().max(4096).refine((value) => new URL(value).protocol === "https:", "A secure HTTPS push endpoint is required."),
+  endpoint: z.string().url().max(4096).refine((value) => value.startsWith("https://"), "A secure HTTPS push endpoint is required."),
 });
 
 /** Returns the public VAPID key needed by the browser to create a push subscription. */
