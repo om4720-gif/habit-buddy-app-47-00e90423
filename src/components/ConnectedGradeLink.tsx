@@ -122,9 +122,27 @@ export function ConnectedGradeLink() {
       }
 
       setPushStep("starting");
+      const host = window.location.hostname;
+      if (
+        window.self !== window.top ||
+        host.startsWith("id-preview--") ||
+        host.startsWith("preview--") ||
+        host === "lovableproject.com" ||
+        host.endsWith(".lovableproject.com") ||
+        host === "lovableproject-dev.com" ||
+        host.endsWith(".lovableproject-dev.com")
+      ) {
+        throw new Error("Open Ritual directly from its published address to enable phone alerts.");
+      }
+
+      await withTimeout(
+        navigator.serviceWorker.register("/sw.js", { scope: "/" }),
+        "Ritual could not register its notification service worker. Refresh and try again.",
+        12_000,
+      );
       const registration = await withTimeout(
         navigator.serviceWorker.ready,
-        "Ritual’s notification service worker did not start. Refresh Ritual and try again.",
+        "Ritual’s notification service worker was registered but did not activate. Check that /sw.js and /push-notifications-sw.js load on the published site.",
         12_000,
       );
       let subscription = await withTimeout(
