@@ -14,6 +14,20 @@ import {
   syncGucGradesNow,
 } from "@/lib/grade-webhook.functions";
 
+async function withTimeout<T>(promise: Promise<T>, message: string, milliseconds: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), milliseconds);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 function decodeApplicationServerKey(value: string): Uint8Array {
   const base64 = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
   const binary = atob(base64);
@@ -32,7 +46,8 @@ export function ConnectedGradeLink() {
   const savePushFn = useServerFn(saveGradePushSubscription);
   const removePushFn = useServerFn(removeGradePushSubscription);
   const [syncing, setSyncing] = useState(false);
-  const [pushBusy, setPushBusy] = useState(false);
+  const [pushStep, setPushStep] = useState<"idle" | "checking" | "permission" | "starting" | "saving">("idle");
+  const pushBusy = pushStep !== "idle";
   const [phoneAlertsEnabled, setPhoneAlertsEnabled] = useState(false);
 
   useEffect(() => {
@@ -77,7 +92,7 @@ export function ConnectedGradeLink() {
   }
 
   async function togglePhoneAlerts() {
-    setPushBusy(true);
+    setPushStep("checking");
     try {
       if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
         toast.error("Phone push notifications are not supported in this browser.");
@@ -98,6 +113,7 @@ export function ConnectedGradeLink() {
         return;
       }
 
+      setPushStep("permission");
       let permission = Notification.permission;
       if (permission === "default") permission = await Notification.requestPermission();
       if (permission !== "granted") {
@@ -105,26 +121,44 @@ export function ConnectedGradeLink() {
         return;
       }
 
-      const registration = await navigator.serviceWorker.ready;
-      let subscription = await registration.pushManager.getSubscription();
+      setPushStep("starting");
+      const registration = await withTimeout(
+        navigator.serviceWorker.ready,
+        "Ritual’s notification service worker did not start. Refresh Ritual and try again.",
+        12_000,
+      );
+      let subscription = await withTimeout(
+        registration.pushManager.getSubscription(),
+        "Your phone’s notification service did not respond. Try again.",
+        10_000,
+      );
       if (!subscription) {
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: decodeApplicationServerKey(config.publicKey),
-        });
+        subscription = await withTimeout(
+          registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: decodeApplicationServerKey(config.publicKey),
+          }),
+          "Your phone could not subscribe to push notifications. Check notification permission and try again.",
+          20_000,
+        );
       }
-      await savePushFn({ data: { endpoint: subscription.endpoint } });
+      setPushStep("saving");
+      await withTimeout(
+        savePushFn({ data: { endpoint: subscription.endpoint } }),
+        "Ritual could not save this phone’s notification subscription. Check the database migration and try again.",
+        15_000,
+      );
       setPhoneAlertsEnabled(true);
       toast.success("Phone grade alerts are enabled on this device.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not enable phone alerts.");
     } finally {
-      setPushBusy(false);
+      setPushStep("idle");
     }
   }
 
   async function disablePhoneAlerts() {
-    setPushBusy(true);
+    setPushStep("saving");
     try {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
@@ -137,7 +171,7 @@ export function ConnectedGradeLink() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not disable phone alerts.");
     } finally {
-      setPushBusy(false);
+      setPushStep("idle");
     }
   }
 
@@ -186,7 +220,17 @@ export function ConnectedGradeLink() {
               onClick={() => void (phoneAlertsEnabled ? disablePhoneAlerts() : togglePhoneAlerts())}
               disabled={pushBusy}
             >
-              {pushBusy ? "Saving…" : phoneAlertsEnabled ? "Disable phone alerts" : "Enable phone alerts"}
+              {pushStep === "checking"
+                ? "Checking…"
+                : pushStep === "permission"
+                  ? "Waiting for permission…"
+                  : pushStep === "starting"
+                    ? "Connecting…"
+                    : pushStep === "saving"
+                      ? "Saving…"
+                      : phoneAlertsEnabled
+                        ? "Disable phone alerts"
+                        : "Enable phone alerts"}
             </Button>
             <Button type="button" variant="ghost" size="sm" className="rounded-full" onClick={() => void disconnect()}>
               Disconnect
