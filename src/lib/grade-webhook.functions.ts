@@ -144,6 +144,7 @@ export const syncGucGradesNow = createServerFn({ method: "POST" })
       ok?: unknown;
       total?: unknown;
       changed?: unknown;
+      delivery?: unknown;
     };
     if (!response.ok || payload.ok !== true) {
       if (response.status === 401) throw new Error("The GUC connection expired. Reconnect from Ritual.");
@@ -153,6 +154,9 @@ export const syncGucGradesNow = createServerFn({ method: "POST" })
     return {
       total: typeof payload.total === "number" ? payload.total : 0,
       changed: typeof payload.changed === "number" ? payload.changed : 0,
+      delivery: payload.delivery && typeof payload.delivery === "object"
+        ? payload.delivery as Record<string, unknown>
+        : null,
     };
   });
 
