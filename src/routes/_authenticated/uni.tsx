@@ -24,6 +24,7 @@ import {
   deleteLecture,
   getCourses,
   getLectures,
+  updateCourse,
   updateLecture,
 } from "@/lib/uni.functions";
 import {
@@ -64,6 +65,7 @@ function UniPage() {
   const fetchCourses = useServerFn(getCourses);
   const fetchLectures = useServerFn(getLectures);
   const createCourseFn = useServerFn(createCourse);
+  const updateCourseFn = useServerFn(updateCourse);
   const createLectureFn = useServerFn(createLecture);
   const updateLectureFn = useServerFn(updateLecture);
   const deleteCourseFn = useServerFn(deleteCourse);
@@ -80,6 +82,9 @@ function UniPage() {
   });
 
   const [courseDialogOpen, setCourseDialogOpen] = useState(false);
+  const [editCourseDialogOpen, setEditCourseDialogOpen] = useState(false);
+  const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
+  const [editCourseName, setEditCourseName] = useState("");
   const [lectureDialogOpen, setLectureDialogOpen] = useState(false);
   const [lectureCourseId, setLectureCourseId] = useState<string>("");
   const [courseForm, setCourseForm] = useState({ name: "", code: "", lectures: "", tutorials: "" });
@@ -308,9 +313,31 @@ function UniPage() {
       await deleteCourseFn({ data: { courseId } });
       queryClient.invalidateQueries({ queryKey: ["courses"] });
       queryClient.invalidateQueries({ queryKey: ["lectures"] });
+      queryClient.invalidateQueries({ queryKey: ["deadlines"] });
+      setSelectedCourseId(null);
       toast.success("Course removed");
     } catch (err) {
       toast.error("Could not remove course");
+    }
+  }
+
+  function openEditCourse(course: (typeof courses)[number]) {
+    setEditingCourseId(course.id);
+    setEditCourseName(course.name);
+    setEditCourseDialogOpen(true);
+  }
+
+  async function handleEditCourse(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingCourseId) return;
+    try {
+      await updateCourseFn({ data: { courseId: editingCourseId, name: editCourseName.trim() } });
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      setEditCourseDialogOpen(false);
+      setEditingCourseId(null);
+      toast.success("Course renamed");
+    } catch {
+      toast.error("Could not rename course");
     }
   }
 
@@ -984,6 +1011,34 @@ function UniPage() {
                 </form>
               </DialogContent>
             </Dialog>
+            <Dialog open={editCourseDialogOpen} onOpenChange={setEditCourseDialogOpen}>
+              <DialogContent className="rounded-2xl border-line bg-card">
+                <DialogHeader>
+                  <DialogTitle className="font-display text-xl text-ink">Rename course</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleEditCourse} className="mt-2 space-y-4">
+                  <div>
+                    <Label htmlFor="editCourseName" className="text-ink-soft">
+                      Course name
+                    </Label>
+                    <Input
+                      id="editCourseName"
+                      value={editCourseName}
+                      onChange={(e) => setEditCourseName(e.target.value)}
+                      required
+                      maxLength={200}
+                      className="mt-1 rounded-xl border-line bg-background text-ink"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full rounded-full bg-rust text-cream hover:bg-rust/90"
+                  >
+                    Save name
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
           </section>
         </>
       )}
@@ -1148,8 +1203,15 @@ function UniPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="rounded-xl border-line bg-card">
+                        <DropdownMenuItem onClick={() => openEditCourse(course)}>
+                          <Pencil className="mr-2 size-4" /> Rename course
+                        </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => removeCourse(course.id)}
+                          onClick={() => {
+                            if (window.confirm(`Delete ${course.name}? Its course data will be removed.`)) {
+                              void removeCourse(course.id);
+                            }
+                          }}
                           className="text-rust focus:bg-cream focus:text-rust"
                         >
                           <Trash2 className="mr-2 size-4" /> Delete course
