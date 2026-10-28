@@ -10,7 +10,6 @@ import { useUserSettings } from "@/lib/useUserSettings";
 export function MeroFloating() {
   const [open, setOpen] = useState(false);
   const agent = useUserSettings().settings.agent_name;
-  const [pos, setPos] = useState(0);
   const [thinking, setThinking] = useState(false);
   const [hop, setHop] = useState(false);
   const hopTimer = useRef<number | undefined>(undefined);
@@ -23,14 +22,8 @@ export function MeroFloating() {
   };
   useEffect(() => () => window.clearTimeout(hopTimer.current), []);
 
-  // Mero drifts between spots along the screen edge every few seconds
-  useEffect(() => {
-    if (open) return;
-    const t = window.setInterval(() => setPos((p) => (p + 1) % 3), 7000);
-    return () => window.clearInterval(t);
-  }, [open]);
-
-  const spots = ["bottom-6 right-6", "bottom-[40%] right-4", "bottom-24 right-10"];
+  // Mero stays in one place, bottom-right. He keeps his idle animation (bobbing, blinking, wings).
+  const spot = "bottom-6 right-6";
 
   return (
     <>
@@ -57,7 +50,7 @@ export function MeroFloating() {
           setOpen((o) => !o);
           celebrate();
         }}
-        className={`fixed z-50 transition-all duration-[2000ms] ease-in-out ${open ? "bottom-6 right-6" : spots[pos]}`}
+        className={`fixed z-50 transition-all duration-[2000ms] ease-in-out ${open ? "bottom-6 right-6" : spot}`}
       >
         <span className="relative block">
           <BuddyFace
