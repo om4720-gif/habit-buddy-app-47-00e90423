@@ -125,7 +125,11 @@ export function matchItem<T extends { title: string }>(feedTitle: string, items:
 export function matchCategory<T extends { title: string }>(feedTitle: string, categories: T[]): T | null {
   const byName = matchItem(feedTitle, categories);
   if (byName) return byName;
-  const types = TYPES.filter((t) => t.feed.test(feedTitle));
+  // GUC labels the assessment first ("Assign. 1") and the sub-question second
+  // ("Question1"). Use the assessment label so "Question" doesn't turn an
+  // assignment into an ambiguous quiz/assignment match.
+  const assessmentLabel = feedTitle.split(/\s+[–—-]\s+/)[0] ?? feedTitle;
+  const types = TYPES.filter((t) => t.feed.test(assessmentLabel));
   if (types.length !== 1) return null; // no clear type, or more than one
   const candidates = categories.filter(
     (c) => types[0]!.category.test(c.title) && !(types[0]!.not && types[0]!.not.test(c.title)),

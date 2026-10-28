@@ -34,7 +34,7 @@ export async function handleGradeWebhook(request: Request, secret: string): Prom
   const { grades } = parseGradeFile(text, type.includes("csv") ? "in.csv" : "in.json");
   if (grades.length === 0) return json(400, { error: "Not a grade. Send course, item and grade." });
 
-  const applied = await applyGrades(db as never, hook.user_id, grades);
+  const applied = await applyGrades(db as never, hook.user_id, grades, { createMissingCourses: true });
 
   // Anything whose course isn't in Ritual is still shown in the bell, so every message is visible.
   let shown = 0;
@@ -96,6 +96,8 @@ export async function handleGradeWebhook(request: Request, secret: string): Prom
   return json(200, {
     received: grades.length,
     updated: applied.updated,
+    saved_unsorted: applied.savedUnsorted,
+    created_courses: [...applied.createdCourses],
     new_popups: applied.notified + shown,
     unmatched_courses: [...applied.unmatchedCourses],
     shown_in_bell_as_unmatched: shown,

@@ -21,6 +21,8 @@ export type FeedRow = { id: string; user_id: string; encrypted_url: string };
 export type ApplyResult = {
   updated: number;
   notified: number;
+  savedUnsorted: number;
+  createdCourses: Set<string>;
   matchedCourse: number;
   matchedCategory: number;
   courseMap: Map<string, string>;
@@ -32,8 +34,14 @@ export type ApplyResult = {
  * Puts grades where they belong for one user: the matching course, then the matching category (as a mark),
  * or the Unsorted box when unsure. A grade that's new for its category raises a popup notification.
  */
-export async function applyGrades(db: Db, userId: string, grades: ImportedGrade[]): Promise<ApplyResult> {
-  const { data: courses } = await db.from("courses").select("id, name, code").eq("user_id", userId);
+export async function applyGrades(
+  db: Db,
+  userId: string,
+  grades: ImportedGrade[],
+  options: { createMissingCourses?: boolean } = {},
+): Promise<ApplyResult> {
+  const { data: courses, error: coursesError } = await db.from("courses").select("id, name, code").eq("user_id", userId);
+  if (coursesError) throw new Error("Could not load courses for incoming grades.");
   const courseList = (courses ?? []) as { id: string; name: string; code: string | null }[];
   const courseIds = courseList.map((c) => c.id);
   const { data: items } = courseIds.length
@@ -45,6 +53,8 @@ export async function applyGrades(db: Db, userId: string, grades: ImportedGrade[
   const result: ApplyResult = {
     updated: 0,
     notified: 0,
+    savedUnsorted: 0,
+    createdCourses: new Set<string>(),
     matchedCourse: 0,
     matchedCategory: 0,
     courseMap: new Map(),
@@ -53,7 +63,18 @@ export async function applyGrades(db: Db, userId: string, grades: ImportedGrade[
   };
 
   for (const g of grades) {
-    const course = matchCourse(g.course, courseList);
+    let course = matchCourse(g.course, courseList);
+    if (!course && options.createMissingCourses && g.course.trim()) {
+      const name = g.course.trim().slice(0, 200);
+      const { data: created, error: createError } = await db.from("courses")
+        .insert({ user_id: userId, name, code: null, color: "#CE552F" })
+        .select("id, name, code")
+        .single();
+      if (createError || !created) throw new Error("Could not save grades for the GUC course.");
+      course = created as { id: string; name: string; code: string | null };
+      courseList.push(course);
+      result.createdCourses.add(course.name);
+    }
     if (!course) {
       result.unmatchedCourses.add(g.course);
       continue;
@@ -67,10 +88,13 @@ export async function applyGrades(db: Db, userId: string, grades: ImportedGrade[
       const cats = itemList.filter((i) => i.course_id === course.id).map((i) => i.title).join(", ") || "none";
       const key = `"${g.title}" in ${course.name} (categories: ${cats})`;
       result.unmatchedItems.set(key, (result.unmatchedItems.get(key) ?? 0) + 1);
-      await db.from("unsorted_grades").upsert(
+      const { error: unsortedError } = await db.from("unsorted_grades").upsert(
         { user_id: userId, course_id: course.id, title: g.title.slice(0, 200), score: g.score, max_score: g.max_score },
         { onConflict: "course_id,title" },
       );
+      if (unsortedError) throw new Error("Could not save an unmatched grade in Ritual.");
+      result.updated++;
+      result.savedUnsorted++;
       continue;
     }
     result.matchedCategory++;
@@ -136,7 +160,8 @@ export async function syncFeed(db: Db, row: FeedRow): Promise<{ updated: number;
     const detail = `read ${grades.length}, course matched ${applied.matchedCourse}, category matched ${applied.matchedCategory}${pairs ? `; courses: ${pairs}` : ""}`;
     const unknown = applied.unmatchedCourses.size ? `; no course for: ${[...applied.unmatchedCourses].slice(0, 2).join(" | ")}` : "";
     const noCategory = applied.unmatchedItems.size ? `; no category for: ${[...applied.unmatchedItems.keys()].slice(0, 2).join(" | ")}` : "";
-    status = `ok: ${updated} updated${notified ? `, ${notified} new` : ""} (${detail}${unknown}${noCategory})`;
+    const created = applied.createdCourses.size ? `; added course: ${[...applied.createdCourses].slice(0, 2).join(" | ")}` : "";
+    status = `ok: ${updated} saved${notified ? `, ${notified} new` : ""} (${detail}${unknown}${noCategory}${created})`;
   } catch (err) {
     status = `error: ${err instanceof Error ? err.message : "unknown error"}`.slice(0, 200);
   }
