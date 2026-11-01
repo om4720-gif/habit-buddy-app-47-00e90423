@@ -15,6 +15,7 @@ import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedGermanRouteImport } from './routes/_authenticated/german'
 import { Route as AuthenticatedUniRouteImport } from './routes/_authenticated/uni'
 import { Route as ApiPublicClaudeRouteImport } from './routes/api/public/claude'
+import { Route as ApiPublicGradeFeedSyncRouteImport } from './routes/api/public/grade-feed-sync'
 import { Route as ApiPublicGradesRouteImport } from './routes/api/public/grades'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -46,6 +47,11 @@ const ApiPublicClaudeRoute = ApiPublicClaudeRouteImport.update({
   path: '/api/public/claude',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicGradeFeedSyncRoute = ApiPublicGradeFeedSyncRouteImport.update({
+  id: '/api/public/grade-feed-sync',
+  path: '/api/public/grade-feed-sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicGradesRoute = ApiPublicGradesRouteImport.update({
   id: '/api/public/grades',
   path: '/api/public/grades',
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/german': typeof AuthenticatedGermanRoute
   '/uni': typeof AuthenticatedUniRoute
   '/api/public/claude': typeof ApiPublicClaudeRoute
+  '/api/public/grade-feed-sync': typeof ApiPublicGradeFeedSyncRoute
   '/api/public/grades': typeof ApiPublicGradesRoute
 }
 export interface FileRoutesByTo {
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/uni': typeof AuthenticatedUniRoute
   '/': typeof AuthenticatedIndexRoute
   '/api/public/claude': typeof ApiPublicClaudeRoute
+  '/api/public/grade-feed-sync': typeof ApiPublicGradeFeedSyncRoute
   '/api/public/grades': typeof ApiPublicGradesRoute
 }
 export interface FileRoutesById {
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/_authenticated/uni': typeof AuthenticatedUniRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/api/public/claude': typeof ApiPublicClaudeRoute
+  '/api/public/grade-feed-sync': typeof ApiPublicGradeFeedSyncRoute
   '/api/public/grades': typeof ApiPublicGradesRoute
 }
 export interface FileRouteTypes {
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
     | '/german'
     | '/uni'
     | '/api/public/claude'
+    | '/api/public/grade-feed-sync'
     | '/api/public/grades'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -94,6 +104,7 @@ export interface FileRouteTypes {
     | '/uni'
     | '/'
     | '/api/public/claude'
+    | '/api/public/grade-feed-sync'
     | '/api/public/grades'
   id:
     | '__root__'
@@ -103,6 +114,7 @@ export interface FileRouteTypes {
     | '/_authenticated/uni'
     | '/_authenticated/'
     | '/api/public/claude'
+    | '/api/public/grade-feed-sync'
     | '/api/public/grades'
   fileRoutesById: FileRoutesById
 }
@@ -110,6 +122,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ApiPublicClaudeRoute: typeof ApiPublicClaudeRoute
+  ApiPublicGradeFeedSyncRoute: typeof ApiPublicGradeFeedSyncRoute
   ApiPublicGradesRoute: typeof ApiPublicGradesRoute
 }
 
@@ -157,6 +170,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicClaudeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/grade-feed-sync': {
+      id: '/api/public/grade-feed-sync'
+      path: '/api/public/grade-feed-sync'
+      fullPath: '/api/public/grade-feed-sync'
+      preLoaderRoute: typeof ApiPublicGradeFeedSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/grades': {
       id: '/api/public/grades'
       path: '/api/public/grades'
@@ -186,6 +206,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ApiPublicClaudeRoute: ApiPublicClaudeRoute,
+  ApiPublicGradeFeedSyncRoute: ApiPublicGradeFeedSyncRoute,
   ApiPublicGradesRoute: ApiPublicGradesRoute,
 }
 export const routeTree = rootRouteImport
