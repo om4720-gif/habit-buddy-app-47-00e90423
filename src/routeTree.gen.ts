@@ -17,6 +17,7 @@ import { Route as AuthenticatedUniRouteImport } from './routes/_authenticated/un
 import { Route as ApiPublicClaudeRouteImport } from './routes/api/public/claude'
 import { Route as ApiPublicGradeFeedSyncRouteImport } from './routes/api/public/grade-feed-sync'
 import { Route as ApiPublicGradesRouteImport } from './routes/api/public/grades'
+import { Route as ApiPublicJobsSendDeadlineRemindersRouteImport } from './routes/api/public/jobs/send-deadline-reminders'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
@@ -57,6 +58,12 @@ const ApiPublicGradesRoute = ApiPublicGradesRouteImport.update({
   path: '/api/public/grades',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicJobsSendDeadlineRemindersRoute =
+  ApiPublicJobsSendDeadlineRemindersRouteImport.update({
+    id: '/api/public/jobs/send-deadline-reminders',
+    path: '/api/public/jobs/send-deadline-reminders',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/api/public/claude': typeof ApiPublicClaudeRoute
   '/api/public/grade-feed-sync': typeof ApiPublicGradeFeedSyncRoute
   '/api/public/grades': typeof ApiPublicGradesRoute
+  '/api/public/jobs/send-deadline-reminders': typeof ApiPublicJobsSendDeadlineRemindersRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
@@ -75,6 +83,7 @@ export interface FileRoutesByTo {
   '/api/public/claude': typeof ApiPublicClaudeRoute
   '/api/public/grade-feed-sync': typeof ApiPublicGradeFeedSyncRoute
   '/api/public/grades': typeof ApiPublicGradesRoute
+  '/api/public/jobs/send-deadline-reminders': typeof ApiPublicJobsSendDeadlineRemindersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -86,6 +95,7 @@ export interface FileRoutesById {
   '/api/public/claude': typeof ApiPublicClaudeRoute
   '/api/public/grade-feed-sync': typeof ApiPublicGradeFeedSyncRoute
   '/api/public/grades': typeof ApiPublicGradesRoute
+  '/api/public/jobs/send-deadline-reminders': typeof ApiPublicJobsSendDeadlineRemindersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/api/public/claude'
     | '/api/public/grade-feed-sync'
     | '/api/public/grades'
+    | '/api/public/jobs/send-deadline-reminders'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/api/public/claude'
     | '/api/public/grade-feed-sync'
     | '/api/public/grades'
+    | '/api/public/jobs/send-deadline-reminders'
   id:
     | '__root__'
     | '/_authenticated'
@@ -116,6 +128,7 @@ export interface FileRouteTypes {
     | '/api/public/claude'
     | '/api/public/grade-feed-sync'
     | '/api/public/grades'
+    | '/api/public/jobs/send-deadline-reminders'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -124,6 +137,7 @@ export interface RootRouteChildren {
   ApiPublicClaudeRoute: typeof ApiPublicClaudeRoute
   ApiPublicGradeFeedSyncRoute: typeof ApiPublicGradeFeedSyncRoute
   ApiPublicGradesRoute: typeof ApiPublicGradesRoute
+  ApiPublicJobsSendDeadlineRemindersRoute: typeof ApiPublicJobsSendDeadlineRemindersRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -184,6 +198,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicGradesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/jobs/send-deadline-reminders': {
+      id: '/api/public/jobs/send-deadline-reminders'
+      path: '/api/public/jobs/send-deadline-reminders'
+      fullPath: '/api/public/jobs/send-deadline-reminders'
+      preLoaderRoute: typeof ApiPublicJobsSendDeadlineRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -208,6 +229,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicClaudeRoute: ApiPublicClaudeRoute,
   ApiPublicGradeFeedSyncRoute: ApiPublicGradeFeedSyncRoute,
   ApiPublicGradesRoute: ApiPublicGradesRoute,
+  ApiPublicJobsSendDeadlineRemindersRoute:
+    ApiPublicJobsSendDeadlineRemindersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
