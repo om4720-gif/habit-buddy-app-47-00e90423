@@ -180,7 +180,6 @@ export const Route = createFileRoute("/api/public/grades")({
         const { data: items, error: itemsError } = await db
           .from("course_grade_items")
           .select("id, title, score, max_score, weight, is_final")
-          .eq("user_id", token.user_id)
           .eq("course_id", course.id);
         if (itemsError) return json(500, { error: "Could not load the course grading scheme." });
 
@@ -207,8 +206,7 @@ export const Route = createFileRoute("/api/public/grades")({
               max_score: grade.max_score,
               updated_at: new Date().toISOString(),
             })
-            .eq("id", item.id)
-            .eq("user_id", token.user_id);
+            .eq("id", item.id);
           if (updateError) return json(500, { error: "Could not save an incoming grade." });
 
           const { error: notificationError } = await db.from("grade_notifications").insert({

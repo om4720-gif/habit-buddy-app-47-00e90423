@@ -117,11 +117,12 @@ export function PushSetup() {
         );
       }
       const keys = subscription.toJSON();
-      if (!keys.endpoint || !keys.keys?.p256dh || !keys.keys?.auth) {
+      const subKeys = keys.keys as { p256dh: string; auth: string } | undefined;
+      if (!keys.endpoint || !subKeys?.p256dh || !subKeys?.auth) {
         throw new Error("Your phone returned an incomplete notification subscription. Try again.");
       }
       await saveFn({
-        data: { endpoint: keys.endpoint, p256dh: keys.keys.p256dh, auth: keys.keys.auth },
+        data: { endpoint: keys.endpoint, p256dh: subKeys.p256dh, auth: subKeys.auth },
       });
       setState("on");
       toast.success("Phone notifications are on. Reminders will pop up even when Ritual is closed.");

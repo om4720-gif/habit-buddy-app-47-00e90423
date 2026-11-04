@@ -58,7 +58,7 @@ export const Route = createFileRoute("/api/public/jobs/send-deadline-reminders")
             .from("push_subscriptions")
             .select("user_id, endpoint, p256dh, auth")
             .in("user_id", userIds);
-          if (error) throw new Error(subsError.message);
+          if (subsError) throw new Error(subsError.message);
           for (const sub of (subs ?? []) as {
             user_id: string;
             endpoint: string;

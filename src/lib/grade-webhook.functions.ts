@@ -126,7 +126,7 @@ export const syncGucGradesNow = createServerFn({ method: "POST" })
       const redirectedController = new AbortController();
       const redirectedTimer = setTimeout(() => redirectedController.abort(), 35_000);
       try {
-        response = await fetch(target.toString(), {
+        response = await fetch(target?.toString() ?? endpoint, {
           method: "POST",
           redirect: "error",
           signal: redirectedController.signal,
@@ -151,12 +151,20 @@ export const syncGucGradesNow = createServerFn({ method: "POST" })
       throw new Error(typeof payload.error === "string" ? payload.error : "GUC could not check grades. Try again.");
     }
 
+    let delivery: Record<string, number> | null = null;
+    const rawDelivery = payload.delivery && typeof payload.delivery === "object"
+      ? (payload.delivery as Record<string, unknown>)
+      : null;
+    if (rawDelivery) {
+      delivery = {};
+      for (const [key, value] of Object.entries(rawDelivery)) {
+        if (typeof value === "number" && Number.isFinite(value)) delivery[key] = value;
+      }
+    }
     return {
       total: typeof payload.total === "number" ? payload.total : 0,
       changed: typeof payload.changed === "number" ? payload.changed : 0,
-      delivery: payload.delivery && typeof payload.delivery === "object"
-        ? payload.delivery as Record<string, unknown>
-        : null,
+      delivery,
     };
   });
 

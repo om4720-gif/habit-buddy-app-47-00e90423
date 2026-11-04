@@ -12,6 +12,7 @@ import { MeroFloating } from "@/components/MeroFloating";
 import { NotificationBell } from "@/components/NotificationBell";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { GradePopup } from "@/components/GradePopup";
+import { PushSetup } from "@/components/PushSetup";
 import { ThemeApplier } from "@/components/ThemeApplier";
 import { WelcomeTour } from "@/components/WelcomeTour";
 import { useUserSettings } from "@/lib/useUserSettings";
@@ -78,6 +79,7 @@ function AppLayout() {
       <MeroFloating />
       <ThemeApplier />
       <GradePopup />
+      <PushSetup />
       <WelcomeTour />
     </div>
   );

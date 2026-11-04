@@ -225,6 +225,7 @@ export type Database = {
           due_date: string
           id: string
           kind: string
+          reminder_sent_at: string | null
           title: string
           updated_at: string
           user_id: string
@@ -236,6 +237,7 @@ export type Database = {
           due_date: string
           id?: string
           kind?: string
+          reminder_sent_at?: string | null
           title: string
           updated_at?: string
           user_id?: string
@@ -247,6 +249,7 @@ export type Database = {
           due_date?: string
           id?: string
           kind?: string
+          reminder_sent_at?: string | null
           title?: string
           updated_at?: string
           user_id?: string
@@ -311,6 +314,45 @@ export type Database = {
           id?: string
           last_checked_at?: string | null
           last_status?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      grade_inbox_checks: {
+        Row: {
+          checked_at: string
+          id: number
+          user_id: string
+        }
+        Insert: {
+          checked_at?: string
+          id?: never
+          user_id: string
+        }
+        Update: {
+          checked_at?: string
+          id?: never
+          user_id?: string
+        }
+        Relationships: []
+      }
+      grade_inbox_tokens: {
+        Row: {
+          created_at: string
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          token?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          token?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -526,6 +568,36 @@ export type Database = {
           },
         ]
       }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       reward_redemptions: {
         Row: {
           cost: number
@@ -638,7 +710,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      consume_grade_inbox_check: {
+        Args: { p_user_id: string }
+        Returns: {
+          allowed: boolean
+          checks_used: number
+          reset_at: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
