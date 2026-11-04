@@ -318,6 +318,45 @@ export type Database = {
         }
         Relationships: []
       }
+      grade_inbox_checks: {
+        Row: {
+          checked_at: string
+          id: number
+          user_id: string
+        }
+        Insert: {
+          checked_at?: string
+          id?: never
+          user_id: string
+        }
+        Update: {
+          checked_at?: string
+          id?: never
+          user_id?: string
+        }
+        Relationships: []
+      }
+      grade_inbox_tokens: {
+        Row: {
+          created_at: string
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          token?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       grade_notifications: {
         Row: {
           course_code: string | null
@@ -671,7 +710,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      consume_grade_inbox_check: {
+        Args: { p_user_id: string }
+        Returns: {
+          allowed: boolean
+          checks_used: number
+          reset_at: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
