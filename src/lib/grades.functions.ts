@@ -216,7 +216,7 @@ export const getGradeInboxToken = createServerFn({ method: "POST" })
 
     const { data, error } = await context.supabase
       .from("grade_inbox_tokens")
-      .insert({})
+      .insert({ user_id: context.userId })
       .select("token")
       .single();
     if (error) throw new Error("Could not create the grade inbox link");
@@ -234,7 +234,7 @@ export const resetGradeInboxToken = createServerFn({ method: "POST" })
 
     const { data, error } = await context.supabase
       .from("grade_inbox_tokens")
-      .insert({})
+      .insert({ user_id: context.userId })
       .select("token")
       .single();
     if (error) throw new Error("Could not create a new grade inbox link");

@@ -199,10 +199,10 @@ export function ConnectedGradeLink() {
       const result = await syncFn();
       await refetch();
       const delivery = result.delivery;
-      const sent = typeof delivery?.sent === "number" ? delivery.sent : null;
-      const accepted = typeof delivery?.accepted === "number" ? delivery.accepted : null;
-      const failed = typeof delivery?.failed === "number" ? delivery.failed : null;
-      const unsorted = typeof delivery?.saved_unsorted === "number" ? delivery.saved_unsorted : null;
+      const sent = typeof delivery?.["sent"] === "number" ? delivery["sent"] : null;
+      const accepted = typeof delivery?.["accepted"] === "number" ? delivery["accepted"] : null;
+      const failed = typeof delivery?.["failed"] === "number" ? delivery["failed"] : null;
+      const unsorted = typeof delivery?.["saved_unsorted"] === "number" ? delivery["saved_unsorted"] : null;
       const deliveryText = sent === null
         ? ""
         : `; Ritual accepted ${accepted ?? sent}${unsorted ? ` (${unsorted} in Unsorted)` : ""}${failed ? `; ${failed} failed` : ""}`;
