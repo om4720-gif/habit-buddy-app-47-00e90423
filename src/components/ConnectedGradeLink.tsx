@@ -154,7 +154,7 @@ export function ConnectedGradeLink() {
         subscription = await withTimeout(
           registration.pushManager.subscribe({
             userVisibleOnly: true,
-            applicationServerKey: decodeApplicationServerKey(config.publicKey),
+            applicationServerKey: decodeApplicationServerKey(config.publicKey) as BufferSource,
           }),
           "Your phone could not subscribe to push notifications. Check notification permission and try again.",
           20_000,
