@@ -103,6 +103,31 @@ export async function sendGradePushNotifications(db: PushDb, userId: string) {
     }
   }
 
+  // Devices that turned on notifications once (deadline reminders) also get grade alerts.
+  const { data: shared } = await db
+    .from("push_subscriptions")
+    .select("endpoint, p256dh, auth")
+    .eq("user_id", userId);
+  const already = new Set(((rows ?? []) as { endpoint: string }[]).map((r) => r.endpoint));
+  const { sendWebPush } = await import("@/lib/webpush.server");
+  const sharedExpired: string[] = [];
+  for (const sub of (shared ?? []) as { endpoint: string; p256dh: string; auth: string }[]) {
+    if (already.has(sub.endpoint) || !sub.p256dh || !sub.auth) continue;
+    const r = await sendWebPush(
+      sub.endpoint,
+      sub.p256dh,
+      sub.auth,
+      { title: "New GUC grade", body: "A new or changed grade is ready in Ritual.", url: "/uni", tag: "ritual-guc-grade" } as never,
+      { publicKey, privateKey, subject },
+    );
+    if (r.ok) sent++;
+    else if (r.expired) sharedExpired.push(sub.endpoint);
+    else failed++;
+  }
+  if (sharedExpired.length > 0) {
+    await db.from("push_subscriptions").delete().eq("user_id", userId).in("endpoint", sharedExpired);
+  }
+
   if (expired.length > 0) {
     await db
       .from("grade_push_subscriptions")

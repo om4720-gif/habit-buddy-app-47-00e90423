@@ -155,6 +155,10 @@ export async function syncFeed(db: Db, row: FeedRow): Promise<{ updated: number;
     const applied = await applyGrades(db, row.user_id, grades);
     updated = applied.updated;
     notified = applied.notified;
+    if (notified > 0) {
+      const { sendGradePushNotifications } = await import("@/lib/grade-push.server");
+      await sendGradePushNotifications(db, row.user_id).catch(() => undefined);
+    }
     const shortFeed = (c: string) => c.replace(/^civil engineering\s*(\d+\w*\s*semester)?\s*[-|]?\s*/i, "").slice(0, 40);
     const pairs = [...applied.courseMap.entries()].map(([f, a]) => `${shortFeed(f)} -> ${a}`).join("; ");
     const detail = `read ${grades.length}, course matched ${applied.matchedCourse}, category matched ${applied.matchedCategory}${pairs ? `; courses: ${pairs}` : ""}`;
