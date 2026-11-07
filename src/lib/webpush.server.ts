@@ -102,7 +102,20 @@ async function encryptAes128Gcm(payload: Uint8Array, p256dh: string, auth: strin
   )) as CryptoKeyPair;
   const ephemeralPublicKey = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
   const sharedSecret = new Uint8Array(
-    await crypto.subtle.deriveBits({ name: "ECDH", public: pair.publicKey }, pair.privateKey, 256),
+    await crypto.subtle.deriveBits(
+      {
+        name: "ECDH",
+        public: await crypto.subtle.importKey(
+          "raw",
+          userPublicKey as BufferSource,
+          { name: "ECDH", namedCurve: "P-256" },
+          false,
+          [],
+        ),
+      },
+      pair.privateKey,
+      256,
+    ),
   );
 
   const webPushInfo = encoder.encode("WebPush: info");
@@ -130,8 +143,8 @@ async function encryptAes128Gcm(payload: Uint8Array, p256dh: string, auth: strin
   const header = new Uint8Array(86);
   header.set(salt, 0);
   new DataView(header.buffer).setUint32(16, 4096, false); // rs
-  new DataView(header.buffer).setUint32(20, ephemeralPublicKey.length, false); // idlen
-  header.set(ephemeralPublicKey, 24);
+  header[20] = ephemeralPublicKey.length; // idlen (uint8)
+  header.set(ephemeralPublicKey, 21);
 
   const body = new Uint8Array(header.length + ciphertext.length);
   body.set(header, 0);
