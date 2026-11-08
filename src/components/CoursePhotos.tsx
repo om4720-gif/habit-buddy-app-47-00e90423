@@ -43,6 +43,7 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
   const pinchActive = useRef(false);
+  const zoomedRef = useRef(false); // true while the photo is zoomed in: then drags pan, never swipe
   const lastPointer = useRef<string | null>(null); // "touch", "pen" or "mouse": only fingers may swipe
 
   const key = ["course-photos", courseId];
@@ -392,13 +393,16 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
         createPortal(
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-ink/85 p-4"
-            onClick={() => setOpenIdx(null)}
+            onClick={(e) => {
+              // Close only when the dark background itself is tapped, not the photo or its controls.
+              if (e.target === e.currentTarget) setOpenIdx(null);
+            }}
             onPointerDown={(e) => {
               lastPointer.current = e.pointerType;
             }}
             onTouchStart={(e) => {
-              if (lastPointer.current !== "touch") {
-                touchX.current = null; // a pen (or mouse) must never change the photo
+              if (lastPointer.current !== "touch" || zoomedRef.current) {
+                touchX.current = null; // a pen, a mouse, or a zoomed photo never changes the photo
                 return;
               }
               if (e.touches.length > 1) {
@@ -414,7 +418,7 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
                 touchX.current = null;
                 return;
               }
-              if (lastPointer.current !== "touch") {
+              if (lastPointer.current !== "touch" || zoomedRef.current) {
                 touchX.current = null;
                 return;
               }
@@ -431,6 +435,9 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
           >
             <TransformWrapper
               key={open.id}
+              onTransformed={(_ref, state) => {
+                zoomedRef.current = state.scale > 1.01;
+              }}
               initialScale={1}
               minScale={1}
               maxScale={5}
