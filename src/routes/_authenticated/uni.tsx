@@ -12,7 +12,7 @@ import {
   Trash2,
   ChevronDown,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -465,6 +465,8 @@ function UniPage() {
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [shownStudied, setShownStudied] = useState<Set<string>>(new Set());
   const [photosOpen, setPhotosOpen] = useState<Set<string>>(new Set());
+  const [revealedLectureId, setRevealedLectureId] = useState<string | null>(null);
+  const lectureTouchStart = useRef<{ id: string; x: number; y: number } | null>(null);
   const toggleIn = (set: Set<string>, key: string) => {
     const next = new Set(set);
     if (next.has(key)) next.delete(key);
@@ -473,6 +475,30 @@ function UniPage() {
   };
 
   const selectedCourse = courses.find((course) => course.id === selectedCourseId);
+
+  function handleLectureTouchStart(lectureId: string, event: React.TouchEvent<HTMLDivElement>) {
+    if (event.target instanceof Element && event.target.closest("button")) return;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    lectureTouchStart.current = { id: lectureId, x: touch.clientX, y: touch.clientY };
+  }
+
+  function handleLectureTouchEnd(lectureId: string, event: React.TouchEvent<HTMLDivElement>) {
+    const start = lectureTouchStart.current;
+    lectureTouchStart.current = null;
+    const touch = event.changedTouches[0];
+    if (!start || start.id !== lectureId || !touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.35) return;
+    if (dx > 0) {
+      const lecture = lectures.find((item) => item.id === lectureId);
+      if (lecture) void toggleLecture(lectureId, !!lecture.completed);
+      setRevealedLectureId(null);
+    } else {
+      setRevealedLectureId(lectureId);
+    }
+  }
 
   useEffect(() => writeLS("uni:tab", tab), [tab]);
 
@@ -1259,10 +1285,47 @@ function UniPage() {
                             </p>
                           ) : (
                             shownItems.map((lecture) => (
-                              <div
-                                key={lecture.id}
-                                className="flex items-center justify-between px-5 py-4 transition hover:bg-cream/30"
-                              >
+                              <div key={lecture.id} className="relative overflow-hidden">
+                                <div className="absolute inset-y-0 right-0 flex w-28 items-center justify-evenly bg-cream/50">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    title={`Edit ${lecture.title}`}
+                                    aria-label={`Edit ${lecture.title}`}
+                                    onClick={() => {
+                                      openEditLecture(lecture);
+                                      setRevealedLectureId(null);
+                                    }}
+                                  >
+                                    <Pencil className="size-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    title="Open course photos"
+                                    aria-label="Open course photos"
+                                    onClick={() => {
+                                      const shouldOpen = !photosOpen.has(course.id);
+                                      setPhotosOpen(toggleIn(photosOpen, course.id));
+                                      setRevealedLectureId(null);
+                                      if (shouldOpen) {
+                                        requestAnimationFrame(() =>
+                                          document
+                                            .getElementById(`course-photos-${course.id}`)
+                                            ?.scrollIntoView({ behavior: "smooth", block: "nearest" }),
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    <FolderClosed className="size-4" />
+                                  </Button>
+                                </div>
+                                <div
+                                  onTouchStart={(event) => handleLectureTouchStart(lecture.id, event)}
+                                  onTouchEnd={(event) => handleLectureTouchEnd(lecture.id, event)}
+                                  onTouchCancel={() => { lectureTouchStart.current = null; }}
+                                  className={`relative flex items-center justify-between bg-card px-5 py-4 transition-transform duration-200 touch-pan-y hover:bg-cream/30 ${revealedLectureId === lecture.id ? "-translate-x-28" : "translate-x-0"}`}
+                                >
                                 <div className="flex items-start gap-3">
                                   <button
                                     onClick={() => toggleLecture(lecture.id, !!lecture.completed)}
@@ -1314,6 +1377,7 @@ function UniPage() {
                                     <Trash2 className="size-4" />
                                   </Button>
                                 </div>
+                                </div>
                               </div>
                             ))
                           )}
@@ -1336,7 +1400,7 @@ function UniPage() {
                       </div>
                     );
                   })}
-                  <div className="border-t border-line">
+                  <div id={`course-photos-${course.id}`} className="border-t border-line">
                     <button
                       onClick={() => setPhotosOpen(toggleIn(photosOpen, course.id))}
                       aria-expanded={photosOpen.has(course.id)}

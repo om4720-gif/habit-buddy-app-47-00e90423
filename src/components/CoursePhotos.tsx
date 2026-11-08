@@ -8,16 +8,26 @@ import {
   Folder,
   FolderPlus,
   Loader2,
+  RotateCcw,
   Trash2,
   X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { toast } from "sonner";
+import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  createCoursePhotoThumbnail,
+  deleteCoursePhotoThumbnail,
+  getCoursePhotoThumbnail,
+  saveCoursePhotoThumbnail,
+} from "@/lib/course-photo-cache";
 
-type Photo = { id: string; path: string; url: string; folder_name: string | null };
+type Photo = { id: string; path: string; url: string; folder_name: string | null; owner_id: string };
 type Folder = { id: string; name: string };
 
 export function CoursePhotos({ courseId }: { courseId: string }) {
@@ -31,6 +41,8 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
+  const pinchActive = useRef(false);
 
   const key = ["course-photos", courseId];
   const foldersKey = ["course-photo-folders", courseId];
@@ -38,6 +50,9 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
   const { data: photos = [] } = useQuery({
     queryKey: key,
     queryFn: async (): Promise<Photo[]> => {
+      const { data: userData } = await supabase.auth.getUser();
+      const ownerId = userData.user?.id;
+      if (!ownerId) return [];
       const { data, error } = await supabase
         .from("course_photos")
         .select("id, path, folder_name")
@@ -51,6 +66,7 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
       return data.map((p, i) => ({
         ...p,
         folder_name: p.folder_name ?? null,
+        owner_id: ownerId,
         url: signed?.[i]?.signedUrl ?? "",
       }));
     },
@@ -74,6 +90,53 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
   const inFolder = folder == null ? [] : photos.filter((p) => p.folder_name === folder);
   const open = openIdx != null && openIdx < inFolder.length ? inFolder[openIdx] : null;
   const unsorted = photos.filter((p) => p.folder_name == null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const objectUrls = new Set<string>();
+    const photosToCache = folder == null
+      ? [...unsorted, ...folders
+          .map((item) => photos.find((photo) => photo.folder_name === item.name))
+          .filter((photo): photo is Photo => photo != null)]
+      : inFolder;
+
+    setThumbnailUrls({});
+    for (const photo of photosToCache) {
+      void (async () => {
+        let cached: Blob | null = null;
+        try {
+          cached = await getCoursePhotoThumbnail(photo.owner_id, photo.id);
+          if (cached && !cancelled) {
+            const localUrl = URL.createObjectURL(cached);
+            objectUrls.add(localUrl);
+            setThumbnailUrls((current) => ({ ...current, [photo.id]: localUrl }));
+          }
+        } catch {
+          // Local storage can be disabled or full; online photos still work.
+        }
+
+        if (cancelled || !navigator.onLine || !photo.url) return;
+        try {
+          const response = await fetch(photo.url);
+          if (!response.ok) return;
+          const thumbnail = await createCoursePhotoThumbnail(await response.blob());
+          await saveCoursePhotoThumbnail(photo.owner_id, photo.id, thumbnail);
+          if (!cancelled && !cached) {
+            const localUrl = URL.createObjectURL(thumbnail);
+            objectUrls.add(localUrl);
+            setThumbnailUrls((current) => ({ ...current, [photo.id]: localUrl }));
+          }
+        } catch {
+          // Preserve the online image if local thumbnail caching is unavailable.
+        }
+      })();
+    }
+
+    return () => {
+      cancelled = true;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [photos, folder, folders]);
 
   function step(delta: number) {
     setOpenIdx((i) => {
@@ -172,6 +235,7 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
   async function remove(p: Photo) {
     await supabase.storage.from("course-photos").remove([p.path]);
     await supabase.from("course_photos").delete().eq("id", p.id);
+    await deleteCoursePhotoThumbnail(p.owner_id, p.id).catch(() => undefined);
     setOpenIdx(null);
     qc.invalidateQueries({ queryKey: key });
   }
@@ -190,7 +254,7 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
       >
         <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-surface-2">
           {items[0]?.url ? (
-            <img src={items[0].url} alt="" loading="lazy" className="size-full object-cover" />
+            <img src={thumbnailUrls[items[0].id] ?? items[0].url} alt="" loading="lazy" className="size-full object-cover" />
           ) : (
             <Folder className="size-4 text-ink-soft" />
           )}
@@ -309,7 +373,7 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
           {inFolder.map((p, i) => (
             <div key={p.id} className="group relative aspect-square overflow-hidden rounded-lg border border-line">
               <button onClick={() => setOpenIdx(i)} className="size-full">
-                <img src={p.url} alt="Tutorial photo" loading="lazy" className="size-full object-cover" />
+                <img src={thumbnailUrls[p.id] ?? p.url} alt="Tutorial photo" loading="lazy" className="size-full object-cover" />
               </button>
               <button
                 onClick={() => remove(p)}
@@ -329,22 +393,79 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
             className="fixed inset-0 z-50 flex items-center justify-center bg-ink/85 p-4"
             onClick={() => setOpenIdx(null)}
             onTouchStart={(e) => {
+              if (e.touches.length > 1) {
+                pinchActive.current = true;
+                touchX.current = null;
+                return;
+              }
               touchX.current = e.changedTouches[0]?.clientX ?? null;
             }}
             onTouchEnd={(e) => {
+              if (pinchActive.current) {
+                if (e.touches.length === 0) pinchActive.current = false;
+                touchX.current = null;
+                return;
+              }
               const endX = e.changedTouches[0]?.clientX;
               if (touchX.current == null || endX == null) return;
               const dx = endX - touchX.current;
               touchX.current = null;
               if (Math.abs(dx) > 40) step(dx < 0 ? 1 : -1);
             }}
+            onTouchCancel={() => {
+              pinchActive.current = false;
+              touchX.current = null;
+            }}
           >
-            <img
-              src={open.url}
-              alt="Tutorial photo"
-              className="max-h-[85vh] max-w-full rounded-lg"
-              onClick={(e) => e.stopPropagation()}
-            />
+            <TransformWrapper
+              key={open.id}
+              initialScale={1}
+              minScale={1}
+              maxScale={5}
+              centerOnInit
+              fitOnInit
+              limitToBounds
+              pinch={{ allowPanning: true }}
+              doubleClick={{ mode: "toggle" }}
+              onPinchStart={() => {
+                pinchActive.current = true;
+                touchX.current = null;
+              }}
+              onPinchStop={() => {
+                window.setTimeout(() => { pinchActive.current = false; }, 0);
+              }}
+            >
+              {({ zoomIn, zoomOut, resetTransform }) => (
+                <>
+                  <TransformComponent
+                    wrapperStyle={{ width: "min(100%, 900px)", height: "85vh", touchAction: "none" }}
+                    contentStyle={{ width: "100%", height: "100%", justifyContent: "center", alignItems: "center" }}
+                  >
+                    <img
+                      src={open.url}
+                      alt="Tutorial photo"
+                      className="max-h-[85vh] max-w-full rounded-lg object-contain"
+                      onClick={(e) => e.stopPropagation()}
+                      onError={(e) => {
+                        const local = thumbnailUrls[open.id];
+                        if (local && e.currentTarget.src !== local) e.currentTarget.src = local;
+                      }}
+                    />
+                  </TransformComponent>
+                  <div className="absolute bottom-5 right-4 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                    <Button size="icon" variant="secondary" aria-label="Zoom in" title="Zoom in" onClick={() => zoomIn()}>
+                      <ZoomIn className="size-4" />
+                    </Button>
+                    <Button size="icon" variant="secondary" aria-label="Zoom out" title="Zoom out" onClick={() => zoomOut()}>
+                      <ZoomOut className="size-4" />
+                    </Button>
+                    <Button size="icon" variant="secondary" aria-label="Reset zoom" title="Reset zoom" onClick={() => resetTransform()}>
+                      <RotateCcw className="size-4" />
+                    </Button>
+                  </div>
+                </>
+              )}
+            </TransformWrapper>
 
             {inFolder.length > 1 && (
               <>
