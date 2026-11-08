@@ -1,7 +1,7 @@
 import { sha256Hex } from "@/lib/grade-webhook.functions";
 import { applyGrades } from "@/lib/feed-sync.server";
 import { parseGradeFile } from "@/lib/grade-import";
-import { sendGradePushNotifications } from "@/lib/grade-push.server";
+import { sendGradeAlertPush } from "@/lib/grade-push.server";
 
 /** Handles a grades-app webhook: a secret in "Authorization: Bearer", and the grade as JSON. */
 export async function handleGradeWebhook(request: Request, secret: string): Promise<Response> {
@@ -81,7 +81,12 @@ export async function handleGradeWebhook(request: Request, secret: string): Prom
   }
   let phonePush = { configured: false, sent: 0, failed: 0, expired: 0 };
   try {
-    phonePush = await sendGradePushNotifications(db as never, hook.user_id);
+    const first = grades[0]!;
+    phonePush = await sendGradeAlertPush(db as never, hook.user_id, {
+      title: "New grade",
+      body: `${first.course} · ${first.title} · ${first.score}/${first.max_score}`,
+      tag: `ritual-grade-${Date.now()}`,
+    });
   } catch {
     phonePush = { configured: true, sent: 0, failed: 1, expired: 0 };
   }

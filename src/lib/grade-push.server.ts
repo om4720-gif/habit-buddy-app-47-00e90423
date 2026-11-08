@@ -137,3 +137,47 @@ export async function sendGradePushNotifications(db: PushDb, userId: string) {
   }
   return { configured: true, sent, failed, expired: expired.length };
 }
+
+/**
+ * Sends a grade alert the same way deadline reminders are sent: an encrypted push with a title and body,
+ * to the phone subscriptions in push_subscriptions. This is the path that works on the lock screen.
+ */
+export async function sendGradeAlertPush(
+  db: PushDb,
+  userId: string,
+  payload: { title: string; body: string; tag: string },
+): Promise<{ configured: boolean; sent: number; failed: number; expired: number }> {
+  const publicKey = process.env["GRADE_PUSH_VAPID_PUBLIC_KEY"]?.trim();
+  const privateKey = process.env["GRADE_PUSH_VAPID_PRIVATE_KEY"]?.trim();
+  const subject = process.env["GRADE_PUSH_VAPID_SUBJECT"]?.trim() || "https://habit-buddy-app-47.lovable.app";
+  if (!publicKey || !privateKey) return { configured: false, sent: 0, failed: 0, expired: 0 };
+
+  const { sendWebPush } = await import("@/lib/webpush.server");
+  const { data: subs, error } = await db
+    .from("push_subscriptions")
+    .select("endpoint, p256dh, auth")
+    .eq("user_id", userId);
+  if (error) throw new Error(error.message);
+
+  let sent = 0;
+  let failed = 0;
+  let expired = 0;
+  for (const sub of (subs ?? []) as { endpoint: string; p256dh: string; auth: string }[]) {
+    const result = await sendWebPush(
+      sub.endpoint,
+      sub.p256dh,
+      sub.auth,
+      { ...payload, url: "/uni" },
+      { publicKey, privateKey, subject },
+    );
+    if (result.expired) {
+      expired++;
+      await db.from("push_subscriptions").delete().eq("user_id", userId).eq("endpoint", sub.endpoint);
+    } else if (result.ok) {
+      sent++;
+    } else {
+      failed++;
+    }
+  }
+  return { configured: true, sent, failed, expired };
+}
