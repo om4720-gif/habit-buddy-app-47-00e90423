@@ -30,6 +30,32 @@ import {
 type Photo = { id: string; path: string; url: string; folder_name: string | null; owner_id: string };
 type Folder = { id: string; name: string };
 
+/** Makes a photo at most 1800px on its long side, as JPEG, so uploads and loading stay fast. */
+async function shrinkImage(file: File): Promise<Blob | File> {
+  if (!file.type.startsWith("image/") || file.type === "image/gif") return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
+    if (scale === 1 && file.size < 1_500_000) {
+      bitmap.close();
+      return file;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+    return blob && blob.size < file.size ? blob : file;
+  } catch {
+    return file;
+  }
+}
+
 export function CoursePhotos({ courseId }: { courseId: string }) {
   const qc = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -103,8 +129,8 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
       : inFolder;
 
     setThumbnailUrls({});
-    for (const photo of photosToCache) {
-      void (async () => {
+    // Download and convert at most 3 photos at a time, so opening a course doesn't pull every original at once.
+    const cacheOne = async (photo: (typeof photosToCache)[number]) => {
         let cached: Blob | null = null;
         try {
           cached = await getCoursePhotoThumbnail(photo.owner_id, photo.id);
@@ -131,8 +157,15 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
         } catch {
           // Preserve the online image if local thumbnail caching is unavailable.
         }
-      })();
-    }
+    };
+    let nextIndex = 0;
+    const runNext = async (): Promise<void> => {
+      while (!cancelled && nextIndex < photosToCache.length) {
+        const photo = photosToCache[nextIndex++]!;
+        await cacheOne(photo);
+      }
+    };
+    for (let i = 0; i < 3; i++) void runNext();
 
     return () => {
       cancelled = true;
@@ -211,11 +244,12 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error("Please sign in");
       for (const file of Array.from(files)) {
-        const ext = file.name.split(".").pop() || "jpg";
+        const shrunk = await shrinkImage(file);
+        const ext = shrunk.type === "image/jpeg" ? "jpg" : file.name.split(".").pop() || "jpg";
         const path = `${u.user.id}/${courseId}/${crypto.randomUUID()}.${ext}`;
         const { error: upErr } = await supabase.storage
           .from("course-photos")
-          .upload(path, file, { contentType: file.type });
+          .upload(path, shrunk, { contentType: shrunk.type });
         if (upErr) throw upErr;
         const { error } = await supabase.from("course_photos").insert({
           course_id: courseId,
