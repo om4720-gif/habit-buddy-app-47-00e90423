@@ -43,6 +43,7 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
   const pinchActive = useRef(false);
+  const lastPointer = useRef<string | null>(null); // "touch", "pen" or "mouse": only fingers may swipe
 
   const key = ["course-photos", courseId];
   const foldersKey = ["course-photo-folders", courseId];
@@ -392,7 +393,14 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-ink/85 p-4"
             onClick={() => setOpenIdx(null)}
+            onPointerDown={(e) => {
+              lastPointer.current = e.pointerType;
+            }}
             onTouchStart={(e) => {
+              if (lastPointer.current !== "touch") {
+                touchX.current = null; // a pen (or mouse) must never change the photo
+                return;
+              }
               if (e.touches.length > 1) {
                 pinchActive.current = true;
                 touchX.current = null;
@@ -403,6 +411,10 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
             onTouchEnd={(e) => {
               if (pinchActive.current) {
                 if (e.touches.length === 0) pinchActive.current = false;
+                touchX.current = null;
+                return;
+              }
+              if (lastPointer.current !== "touch") {
                 touchX.current = null;
                 return;
               }
