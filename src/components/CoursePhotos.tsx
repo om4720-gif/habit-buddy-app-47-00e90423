@@ -469,7 +469,7 @@ export function CoursePhotos({ courseId }: { courseId: string }) {
           >
             <TransformWrapper
               key={open.id}
-              onTransformed={(_ref, state) => {
+              onTransform={(_ref: unknown, state: { scale: number }) => {
                 zoomedRef.current = state.scale > 1.01;
               }}
               initialScale={1}
