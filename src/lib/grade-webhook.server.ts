@@ -32,7 +32,7 @@ export async function handleGradeWebhook(request: Request, secret: string): Prom
   const text = (await request.text()).slice(0, 200_000);
   const type = request.headers.get("content-type") ?? "";
   const { grades } = parseGradeFile(text, type.includes("csv") ? "in.csv" : "in.json");
-  if (grades.length === 0) return json(400, { error: "Not a grade. Send course, item and grade." });
+  if (grades.length === 0) return json(200, { received: 0, note: "No grades in this message; nothing to do." });
 
   const applied = await applyGrades(db as never, hook.user_id, grades, { createMissingCourses: true });
 
