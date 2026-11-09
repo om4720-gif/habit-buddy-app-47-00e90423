@@ -28,6 +28,7 @@ export type ApplyResult = {
   courseMap: Map<string, string>;
   unmatchedCourses: Set<string>;
   unmatchedItems: Map<string, number>;
+  newGrades: { course: string; title: string; score: number; max_score: number }[];
 };
 
 /**
@@ -60,6 +61,7 @@ export async function applyGrades(
     courseMap: new Map(),
     unmatchedCourses: new Set(),
     unmatchedItems: new Map(),
+    newGrades: [],
   };
 
   for (const g of grades) {
@@ -131,6 +133,7 @@ export async function applyGrades(
         max_score: g.max_score,
       });
       result.notified++;
+      result.newGrades.push({ course: course.name, title: g.title, score: g.score, max_score: g.max_score });
     }
   }
   return result;
@@ -156,8 +159,15 @@ export async function syncFeed(db: Db, row: FeedRow): Promise<{ updated: number;
     updated = applied.updated;
     notified = applied.notified;
     if (notified > 0) {
-      const { sendGradePushNotifications } = await import("@/lib/grade-push.server");
-      await sendGradePushNotifications(db, row.user_id).catch(() => undefined);
+      const { sendGradeAlertPush } = await import("@/lib/grade-push.server");
+      const first = applied.newGrades[0];
+      await sendGradeAlertPush(db as never, row.user_id, {
+        title: "New grade",
+        body: first
+          ? `${first.course} · ${first.title} · ${first.score}/${first.max_score}${notified > 1 ? ` (+${notified - 1} more)` : ""}`
+          : "A new grade is ready in Ritual.",
+        tag: `ritual-grade-${Date.now()}`,
+      }).catch(() => undefined);
     }
     const shortFeed = (c: string) => c.replace(/^civil engineering\s*(\d+\w*\s*semester)?\s*[-|]?\s*/i, "").slice(0, 40);
     const pairs = [...applied.courseMap.entries()].map(([f, a]) => `${shortFeed(f)} -> ${a}`).join("; ");
