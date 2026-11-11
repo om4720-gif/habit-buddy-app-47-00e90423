@@ -90,6 +90,10 @@ export async function applyGrades(
       const cats = itemList.filter((i) => i.course_id === course.id).map((i) => i.title).join(", ") || "none";
       const key = `"${g.title}" in ${course.name} (categories: ${cats})`;
       result.unmatchedItems.set(key, (result.unmatchedItems.get(key) ?? 0) + 1);
+      const { data: prevUnsorted } = await db.from("unsorted_grades")
+        .select("score, max_score").eq("course_id", course.id).eq("title", g.title.slice(0, 200)).maybeSingle();
+      const prev = prevUnsorted as { score: number | null; max_score: number } | null;
+      const isNewUnsorted = !prev || Number(prev.score) !== g.score || Number(prev.max_score) !== g.max_score;
       const { error: unsortedError } = await db.from("unsorted_grades").upsert(
         { user_id: userId, course_id: course.id, title: g.title.slice(0, 200), score: g.score, max_score: g.max_score },
         { onConflict: "course_id,title" },
@@ -97,6 +101,15 @@ export async function applyGrades(
       if (unsortedError) throw new Error("Could not save an unmatched grade in Ritual.");
       result.updated++;
       result.savedUnsorted++;
+      if (isNewUnsorted) {
+        await db.from("grade_notifications").insert({
+          user_id: userId, course_id: course.id, grade_item_id: null,
+          course_name: course.name, course_code: course.code,
+          grade_title: g.title.slice(0, 200), score: g.score, max_score: g.max_score,
+        });
+        result.notified++;
+        result.newGrades.push({ course: course.name, title: g.title, score: g.score, max_score: g.max_score });
+      }
       continue;
     }
     result.matchedCategory++;
