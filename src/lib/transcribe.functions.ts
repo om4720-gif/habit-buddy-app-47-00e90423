@@ -10,10 +10,26 @@ const PROMPT =
   "Write Arabic words in Arabic script and English words (course names, 'lecture', 'tutorial', 'assignment') in English. " +
   "Output only the transcript, with no commentary and no quotation marks. If there is no speech, output nothing.";
 
-/** Tells the client whether cloud transcription (Gemini, via the free key) is available. */
+/**
+ * Cloud transcription spends the app owner's AI key, so only accounts listed in the
+ * VOICE_ALLOWED_EMAILS secret (comma-separated) may use it. With no list set, nobody can.
+ * Everyone else falls back to the device's built-in speech recognition.
+ */
+function canUseCloudVoice(claims: { email?: unknown }): boolean {
+  const allowed = (process.env["VOICE_ALLOWED_EMAILS"] ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  const email = typeof claims.email === "string" ? claims.email.trim().toLowerCase() : "";
+  return email !== "" && allowed.includes(email);
+}
+
+/** Tells the client whether cloud transcription (Gemini, via the free key) is available to this user. */
 export const getVoiceEngine = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => ({ cloud: getFallbackAI() !== null }));
+  .handler(async ({ context }) => ({
+    cloud: getFallbackAI() !== null && canUseCloudVoice(context.claims),
+  }));
 
 export const transcribeAudio = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -30,6 +46,9 @@ export const transcribeAudio = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data, context }) => {
+    if (!canUseCloudVoice(context.claims)) {
+      throw new Error("Cloud voice is not enabled for this account.");
+    }
     // Every recording is a paid or quota-limited AI call: limit it per person.
     limitUser(context.userId, "voice", [
       { limit: 10, windowMs: MINUTE, label: "voice" },
