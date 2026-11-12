@@ -30,15 +30,34 @@ export const createDeadline = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const supabase = context.supabase;
-    const { error } = await supabase.from("deadlines").insert({
-      course_id: data.courseId,
-      title: data.title,
-      kind: data.kind,
-      due_date: data.dueDate,
-    } as never);
+    const { data: created, error } = await supabase
+      .from("deadlines")
+      .insert({
+        course_id: data.courseId,
+        title: data.title,
+        kind: data.kind,
+        due_date: data.dueDate,
+      } as never)
+      .select("id")
+      .single();
     if (error) throw new Error(error.message);
+    await pushIfDueSoon((created as { id: string } | null)?.id, context.userId);
     return { success: true };
   });
+
+/**
+ * If a deadline is already inside its reminder window (e.g. added the day before it's due),
+ * send its phone push now instead of waiting for the hourly job. Never fails the save.
+ */
+async function pushIfDueSoon(deadlineId: string | undefined, userId: string) {
+  if (!deadlineId) return;
+  try {
+    const { sendDueDeadlineReminders } = await import("@/lib/deadline-push.server");
+    await sendDueDeadlineReminders({ deadlineId, userId });
+  } catch (error) {
+    console.error("Deadline push failed:", error);
+  }
+}
 
 export const updateDeadline = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -60,13 +79,20 @@ export const updateDeadline = createServerFn({ method: "POST" })
     };
     if (data.title !== undefined) updates.title = data.title;
     if (data.kind !== undefined) updates.kind = data.kind;
-    if (data.dueDate !== undefined) updates.due_date = data.dueDate;
+    if (data.dueDate !== undefined) {
+      updates.due_date = data.dueDate;
+      // A new date gets a fresh reminder.
+      updates.reminder_sent_at = null;
+    }
     if (data.completed !== undefined) updates.completed = data.completed;
     const { error } = await supabase
       .from("deadlines")
       .update(updates)
       .eq("id", data.deadlineId);
     if (error) throw new Error(error.message);
+    if (data.dueDate !== undefined || data.completed === false) {
+      await pushIfDueSoon(data.deadlineId, context.userId);
+    }
     return { success: true };
   });
 
