@@ -127,8 +127,10 @@ async function encryptAes128Gcm(payload: Uint8Array, p256dh: string, auth: strin
   const ikm = await hkdf(authSecret, sharedSecret, ikmInput, 32);
 
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const contentEncryptionKey = await hkdf(salt, ikm, encoder.encode("Content-Encoding: aes128gcm"), 16);
-  const nonce = await hkdf(salt, ikm, encoder.encode("Content-Encoding: nonce"), 12);
+  // RFC 8188: both info strings end with a 0x00 byte. Without it the device derives
+  // different keys, can't decrypt the message, and silently drops it.
+  const contentEncryptionKey = await hkdf(salt, ikm, encoder.encode("Content-Encoding: aes128gcm\0"), 16);
+  const nonce = await hkdf(salt, ikm, encoder.encode("Content-Encoding: nonce\0"), 12);
 
   // aes128gcm record: plaintext || 0x02 delimiter || zero padding. One small record.
   const record = new Uint8Array(payload.length + 1);
