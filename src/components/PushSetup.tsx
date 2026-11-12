@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   getPushConfig,
   removePushSubscription,
+  resetPushSubscriptions,
   savePushSubscription,
   sendTestPush,
 } from "@/lib/push.functions";
@@ -52,8 +53,25 @@ export function PushSetup() {
   const saveFn = useServerFn(savePushSubscription);
   const removeFn = useServerFn(removePushSubscription);
   const testFn = useServerFn(sendTestPush);
+  const resetFn = useServerFn(resetPushSubscriptions);
   const [state, setState] = useState<SetupState>("checking");
-  const [busy, setBusy] = useState<"on" | "off" | "test" | null>(null);
+  const [busy, setBusy] = useState<"on" | "off" | "test" | "reset" | null>(null);
+
+  // The service worker reports back when it receives and displays a push.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    const onMessage = (event: MessageEvent) => {
+      const message = event.data as { type?: string; stage?: string; error?: string } | null;
+      if (message?.type !== "ritual-push") return;
+      if (message.stage === "shown") {
+        toast.success("This device received the notification and displayed it.");
+      } else {
+        toast.error(`This device received the push but could not show it: ${message.error ?? "unknown error"}`);
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -154,14 +172,48 @@ export function PushSetup() {
   async function test() {
     setBusy("test");
     try {
-      const result = await testFn();
-      toast.success(
-        result.sent === 1
-          ? "Test sent — check your notifications."
-          : `Test sent to ${result.sent} devices.`,
-      );
+      const registration = await navigator.serviceWorker.getRegistration();
+      const subscription = registration ? await registration.pushManager.getSubscription() : null;
+      if (!subscription) {
+        setState("off");
+        throw new Error("This device has no active subscription. Turn phone notifications on again.");
+      }
+      const result = await testFn({ data: { endpoint: subscription.endpoint } });
+      const device = result.devices[0];
+      if (!device) throw new Error("No device was tested.");
+      if (device.ok) {
+        toast.success(
+          `Push accepted by ${device.service} (${device.status}). Waiting for this device to show it…`,
+        );
+      } else if (device.expired) {
+        setState("off");
+        await subscription.unsubscribe().catch(() => {});
+        toast.error(
+          `${device.service} says this subscription has expired (${device.status}). Turn notifications on again.`,
+        );
+      } else {
+        toast.error(
+          `${device.service} rejected the push (${device.status || "network error"})${device.error ? `: ${device.error}` : ""}. Tap Reset devices and turn notifications on again.`,
+        );
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not send a test.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function reset() {
+    setBusy("reset");
+    try {
+      await resetFn();
+      const registration = await navigator.serviceWorker.getRegistration();
+      const subscription = registration ? await registration.pushManager.getSubscription() : null;
+      if (subscription) await subscription.unsubscribe().catch(() => {});
+      setState("off");
+      toast.success("All saved devices were removed. Turn notifications on again on your phone.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not reset devices.");
     } finally {
       setBusy(null);
     }
@@ -208,6 +260,10 @@ export function PushSetup() {
           <Button type="button" variant="outline" size="sm" disabled={busy !== null} onClick={test}>
             {busy === "test" ? <Loader2 className="size-4 animate-spin" /> : <Bell className="size-4" />}
             Send test notification
+          </Button>
+          <Button type="button" variant="ghost" size="sm" disabled={busy !== null} onClick={reset}>
+            {busy === "reset" ? <Loader2 className="size-4 animate-spin" /> : null}
+            Reset devices
           </Button>
           <span className="text-xs text-ink-soft">On — reminders pop up even when Ritual is closed.</span>
         </>

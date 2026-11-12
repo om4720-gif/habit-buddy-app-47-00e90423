@@ -25,8 +25,27 @@ self.addEventListener("push", (event) => {
         data: { url: "/uni" },
       };
   const title = payload ? payload.title || "Ritual" : "New GUC grade";
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    self.registration
+      .showNotification(title, options)
+      .then(() => tellClients({ type: "ritual-push", stage: "shown", title }))
+      .catch((error) =>
+        tellClients({
+          type: "ritual-push",
+          stage: "error",
+          error: String(error && error.message ? error.message : error),
+        }),
+      ),
+  );
 });
+
+// Lets an open Ritual window confirm this device really received and displayed a push.
+function tellClients(message) {
+  return self.clients
+    .matchAll({ type: "window", includeUncontrolled: true })
+    .then((windows) => windows.forEach((client) => client.postMessage(message)))
+    .catch(() => {});
+}
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();

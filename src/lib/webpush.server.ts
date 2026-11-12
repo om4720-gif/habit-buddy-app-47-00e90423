@@ -152,7 +152,7 @@ async function encryptAes128Gcm(payload: Uint8Array, p256dh: string, auth: strin
   return body;
 }
 
-export type SendResult = { ok: boolean; expired: boolean; status: number };
+export type SendResult = { ok: boolean; expired: boolean; status: number; error?: string | undefined };
 
 /** Sends one encrypted Web Push message to one subscription endpoint. */
 export async function sendWebPush(
@@ -176,12 +176,21 @@ export async function sendWebPush(
       },
       body: body as BufferSource,
     });
+    const error = response.ok
+      ? undefined
+      : (await response.text().catch(() => "")).slice(0, 300) || undefined;
     return {
       ok: response.ok,
       expired: response.status === 404 || response.status === 410,
       status: response.status,
+      error,
     };
-  } catch {
-    return { ok: false, expired: false, status: 0 };
+  } catch (error) {
+    return {
+      ok: false,
+      expired: false,
+      status: 0,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
