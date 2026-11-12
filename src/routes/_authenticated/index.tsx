@@ -13,6 +13,13 @@ import { markYoursSeen, useYoursSeen } from "@/lib/customize";
 import { PointsChip, RewardsDialog, useRewards } from "@/components/RewardShop";
 import { AddHabitModal } from "@/components/AddHabitModal";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   createHabit,
   deleteHabit,
   getHabitsForDate,
@@ -42,6 +49,7 @@ function DashboardPage() {
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
   const [rewardsOpen, setRewardsOpen] = useState<"treats" | "buddy" | null>(null);
+  const [reviewDate, setReviewDate] = useState<string | null>(null);
   const yoursSeen = useYoursSeen();
   const [soundOn, setSoundOnState] = useState(isSoundOn);
   const { balance } = useRewards();
@@ -51,10 +59,27 @@ function DashboardPage() {
     queryFn: () => getHabitsForDate({ data: { date } }),
   });
 
+  const {
+    data: reviewHabits,
+    isPending: reviewHabitsPending,
+    isError: reviewHabitsError,
+  } = useQuery({
+    queryKey: ["habits", reviewDate],
+    queryFn: () => getHabitsForDate({ data: { date: reviewDate ?? date } }),
+    enabled: reviewDate !== null,
+  });
+
   const { data: stats, isPending: statsPending } = useQuery({
     queryKey: ["stats", date],
     queryFn: () => getStats({ data: { date } }),
   });
+
+  const reviewableHabits = reviewDate
+    ? reviewHabits?.filter(
+        (habit) =>
+          !habit.created_at || format(new Date(habit.created_at), "yyyy-MM-dd") <= reviewDate,
+      )
+    : reviewHabits;
 
   const completedCount = habits?.filter((h) => h.completed).length ?? 0;
   const totalCount = habits?.length ?? 0;
@@ -67,16 +92,19 @@ function DashboardPage() {
     if (next) playTick();
   };
 
-  const handleToggle = async (habitId: string) => {
+  const handleToggle = async (habitId: string, completionDate = date) => {
     // Play instantly on tick (not on un-tick) so it feels snappy.
-    const wasDone = habits?.find((h) => h.id === habitId)?.completed;
+    const currentHabits = completionDate === date ? habits : reviewableHabits;
+    const completed = currentHabits?.filter((h) => h.completed).length ?? 0;
+    const total = currentHabits?.length ?? 0;
+    const wasDone = currentHabits?.find((h) => h.id === habitId)?.completed;
     if (!wasDone) {
-      if (totalCount > 0 && completedCount + 1 === totalCount) playAllDone();
+      if (total > 0 && completed + 1 === total) playAllDone();
       else playTick();
     }
     try {
-      await toggleCompletion({ data: { habitId, date } });
-      queryClient.invalidateQueries({ queryKey: ["habits", date] });
+      await toggleCompletion({ data: { habitId, date: completionDate } });
+      queryClient.invalidateQueries({ queryKey: ["habits", completionDate] });
       queryClient.invalidateQueries({ queryKey: ["stats", date] });
       queryClient.invalidateQueries({ queryKey: ["habit-history"] });
       queryClient.invalidateQueries({ queryKey: ["points"] });
@@ -176,6 +204,7 @@ function DashboardPage() {
 
         <HabitTracker
           date={date}
+          onSelectDate={setReviewDate}
           footer={
             <StatsRow
               longestStreak={stats?.longestStreak ?? 0}
@@ -187,6 +216,95 @@ function DashboardPage() {
           }
         />
       </div>
+
+      <Dialog
+        open={reviewDate !== null}
+        onOpenChange={(open) => {
+          if (!open) setReviewDate(null);
+        }}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto rounded-2xl border-line bg-card">
+          {reviewDate && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="font-display text-xl text-ink">
+                  {format(new Date(`${reviewDate}T00:00:00`), "EEEE, MMMM d")}
+                </DialogTitle>
+                <DialogDescription>
+                  Review and update the habits you completed that day.
+                </DialogDescription>
+              </DialogHeader>
+
+              {reviewHabitsPending ? (
+                <div className="space-y-3">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-14 animate-pulse rounded-2xl bg-cream" />
+                  ))}
+                </div>
+              ) : reviewHabitsError ? (
+                <p className="text-sm text-destructive">Could not load habits for this day.</p>
+              ) : reviewableHabits && reviewableHabits.length > 0 ? (
+                <>
+                  <p className="text-xs tabular-nums text-ink-soft">
+                    {reviewableHabits.filter((habit) => habit.completed).length} of{" "}
+                    {reviewableHabits.length} done
+                  </p>
+                  <ul className="space-y-3">
+                    {reviewableHabits.map((habit, i) => {
+                      const color = habitColor(i);
+                      return (
+                        <li
+                          key={habit.id}
+                          className={`flex items-center gap-4 rounded-2xl bg-cream p-4 ring-1 ring-black/5 transition ${
+                            habit.completed ? "opacity-70" : ""
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleToggle(habit.id, reviewDate)}
+                            aria-pressed={habit.completed}
+                            aria-label={`Mark ${habit.name} as ${habit.completed ? "not done" : "done"}`}
+                            className={`grid size-8 shrink-0 place-items-center rounded-full border-2 transition ${
+                              habit.completed ? "stamp-check text-cream" : "text-transparent"
+                            }`}
+                            style={
+                              habit.completed
+                                ? { backgroundColor: color, borderColor: color }
+                                : { borderColor: `${color}66`, color: `${color}66` }
+                            }
+                          >
+                            <span className="font-display text-sm leading-none font-semibold">
+                              ✓
+                            </span>
+                          </button>
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className={`font-medium text-balance ${
+                                habit.completed
+                                  ? "text-ink-soft line-through decoration-rust/40"
+                                  : "text-ink"
+                              }`}
+                            >
+                              {habit.name}
+                            </p>
+                            {habit.description ? (
+                              <p className="mt-0.5 truncate text-xs text-ink-soft">
+                                {habit.description}
+                              </p>
+                            ) : null}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              ) : (
+                <p className="text-sm text-ink-soft">No habits to review for this day.</p>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {isAdding && (
         <AddHabitModal
