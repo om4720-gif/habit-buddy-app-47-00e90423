@@ -48,7 +48,15 @@ export type TrackerData = {
   completions: { habit_id: string; completed_date: string }[];
 };
 
-export function HabitTracker({ date, footer }: { date: string; footer?: ReactNode }) {
+export function HabitTracker({
+  date,
+  footer,
+  onSelectDate,
+}: {
+  date: string;
+  footer?: ReactNode;
+  onSelectDate: (date: string) => void;
+}) {
   const [range, setRange] = useState<Range>("month");
   const [offset, setOffset] = useState(0);
   const [focusId, setFocusId] = useState<string | null>(null);
@@ -82,6 +90,7 @@ export function HabitTracker({ date, footer }: { date: string; footer?: ReactNod
       data={data}
       isPending={isPending}
       footer={footer}
+      onSelectDate={onSelectDate}
     />
   );
 }
@@ -99,6 +108,7 @@ export function TrackerView({
   data,
   isPending,
   footer,
+  onSelectDate,
 }: {
   date: string;
   range: Range;
@@ -111,6 +121,7 @@ export function TrackerView({
   data: TrackerData | undefined;
   isPending: boolean;
   footer?: ReactNode;
+  onSelectDate: (date: string) => void;
 }) {
   const today = new Date(`${date}T00:00:00`);
   const base = shiftBy(today, range, offset);
@@ -156,10 +167,15 @@ export function TrackerView({
   const cols = Math.max(1, Math.min(visible.length, visible.length <= 6 ? 3 : 4));
   const dotSize =
     range === "week"
-      ? focused ? "size-5" : "size-3 sm:size-3.5"
-      : focused ? "size-3.5" : "size-1.5 sm:size-2";
+      ? focused
+        ? "size-5"
+        : "size-3 sm:size-3.5"
+      : focused
+        ? "size-3.5"
+        : "size-1.5 sm:size-2";
 
-  const stateOf = (r: (typeof rows)[number], s: string): DayState => r.states[dayIndex.get(s) ?? -1] ?? "before";
+  const stateOf = (r: (typeof rows)[number], s: string): DayState =>
+    r.states[dayIndex.get(s) ?? -1] ?? "before";
 
   const dotsFor = (d: Date) => (
     <div className="mt-1 grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${cols}, auto)` }}>
@@ -169,7 +185,13 @@ export function TrackerView({
           <span
             key={r.habit.id}
             title={`${r.habit.name}, ${format(d, "EEE d MMM")}: ${
-              st === "done" ? "done" : st === "missed" ? "missed" : st === "future" ? "upcoming" : "not started"
+              st === "done"
+                ? "done"
+                : st === "missed"
+                  ? "missed"
+                  : st === "future"
+                    ? "upcoming"
+                    : "not started"
             }`}
             className={`block rounded-full ${dotSize}`}
             style={
@@ -203,7 +225,9 @@ export function TrackerView({
   return (
     <section className="mt-10">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft">Calendar</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-soft">
+          Calendar
+        </h2>
         <div className="inline-flex rounded-full bg-paper p-1 ring-1 ring-black/5">
           {RANGES.map((r) => (
             <button
@@ -211,7 +235,9 @@ export function TrackerView({
               aria-pressed={range === r}
               onClick={() => onRange(r)}
               className={`rounded-full px-3 py-1 text-xs font-semibold capitalize transition ${
-                range === r ? "bg-cream text-ink shadow-sm ring-1 ring-black/5" : "text-ink-soft hover:text-ink"
+                range === r
+                  ? "bg-cream text-ink shadow-sm ring-1 ring-black/5"
+                  : "text-ink-soft hover:text-ink"
               }`}
             >
               {r}
@@ -222,11 +248,23 @@ export function TrackerView({
 
       <div className="mt-4 rounded-3xl bg-cream p-5 ring-1 ring-black/5 sm:p-6">
         <div className="flex items-center justify-between">
-          <button className={arrow} aria-label={`Previous ${range}`} onClick={() => onOffset(offset - 1)}>
+          <button
+            className={arrow}
+            aria-label={`Previous ${range}`}
+            onClick={() => onOffset(offset - 1)}
+          >
             ‹
           </button>
-          <p className="font-display text-lg font-semibold tabular-nums text-ink">{period}</p>
-          <button className={arrow} aria-label={`Next ${range}`} disabled={offset >= 0} onClick={() => onOffset(offset + 1)}>
+          <div className="text-center">
+            <p className="font-display text-lg font-semibold tabular-nums text-ink">{period}</p>
+            <p className="text-[11px] text-ink-soft">Select a day to review its habits.</p>
+          </div>
+          <button
+            className={arrow}
+            aria-label={`Next ${range}`}
+            disabled={offset >= 0}
+            onClick={() => onOffset(offset + 1)}
+          >
             ›
           </button>
         </div>
@@ -234,28 +272,40 @@ export function TrackerView({
         {isPending ? (
           <div className="mt-4 h-56 animate-pulse rounded-xl bg-paper" />
         ) : rows.length === 0 ? (
-          <p className="mt-4 text-sm text-ink-soft">Add a habit and its dots will show up on the calendar.</p>
+          <p className="mt-4 text-sm text-ink-soft">
+            Add a habit and its dots will show up on the calendar.
+          </p>
         ) : (
           <>
             {range === "week" && (
               <div className="mt-4 grid grid-cols-7 gap-1.5 sm:gap-2">
                 {days.map((d) => {
-                  const isToday = fmt(d) === date;
-                  const future = fmt(d) > date;
+                  const day = fmt(d);
+                  const isToday = day === date;
+                  const future = day > date;
                   return (
-                    <div
-                      key={fmt(d)}
-                      data-day={fmt(d)}
-                      className={`flex flex-col items-center rounded-2xl bg-paper px-1 py-3 ${
+                    <button
+                      key={day}
+                      type="button"
+                      data-day={day}
+                      disabled={future}
+                      onClick={() => onSelectDate(day)}
+                      aria-label={`Review habits for ${format(d, "EEEE, MMMM d")}`}
+                      title={future ? undefined : "Review habits for this day"}
+                      className={`flex flex-col items-center rounded-2xl bg-paper px-1 py-3 transition enabled:hover:bg-sand enabled:focus-visible:outline-none enabled:focus-visible:ring-2 enabled:focus-visible:ring-rust/50 ${
                         isToday ? "ring-2 ring-rust/50" : ""
                       } ${future ? "opacity-60" : ""}`}
                     >
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft">{format(d, "EEE")}</span>
-                      <span className={`font-display text-lg font-semibold tabular-nums ${isToday ? "text-rust" : "text-ink"}`}>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+                        {format(d, "EEE")}
+                      </span>
+                      <span
+                        className={`font-display text-lg font-semibold tabular-nums ${isToday ? "text-rust" : "text-ink"}`}
+                      >
                         {d.getDate()}
                       </span>
                       {dotsFor(d)}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -265,7 +315,10 @@ export function TrackerView({
               <div className="mt-4">
                 <div className="grid grid-cols-7 gap-1" aria-hidden="true">
                   {weekdayLetters.map((l, i) => (
-                    <span key={i} className="text-center text-[10px] font-semibold uppercase text-ink-soft">
+                    <span
+                      key={i}
+                      className="text-center text-[10px] font-semibold uppercase text-ink-soft"
+                    >
                       {l}
                     </span>
                   ))}
@@ -275,13 +328,19 @@ export function TrackerView({
                     <span key={`b${i}`} />
                   ))}
                   {days.map((d) => {
-                    const isToday = fmt(d) === date;
-                    const future = fmt(d) > date;
+                    const day = fmt(d);
+                    const isToday = day === date;
+                    const future = day > date;
                     return (
-                      <div
-                        key={fmt(d)}
-                        data-day={fmt(d)}
-                        className={`flex min-h-[44px] flex-col items-center rounded-xl px-0.5 py-1 sm:min-h-[56px] ${
+                      <button
+                        key={day}
+                        type="button"
+                        data-day={day}
+                        disabled={future}
+                        onClick={() => onSelectDate(day)}
+                        aria-label={`Review habits for ${format(d, "EEEE, MMMM d")}`}
+                        title={future ? undefined : "Review habits for this day"}
+                        className={`flex min-h-[44px] w-full flex-col items-center rounded-xl px-0.5 py-1 transition enabled:hover:bg-paper enabled:focus-visible:outline-none enabled:focus-visible:ring-2 enabled:focus-visible:ring-rust/50 sm:min-h-[56px] ${
                           isToday ? "bg-rust/10 ring-1 ring-rust/40" : ""
                         }`}
                       >
@@ -293,7 +352,7 @@ export function TrackerView({
                           {d.getDate()}
                         </span>
                         {dotsFor(d)}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -332,10 +391,15 @@ export function TrackerView({
                                   ? { backgroundColor: `${focused.color}22` }
                                   : undefined;
                           } else {
-                            const sts = rows.map((r) => stateOf(r, s)).filter((x) => x === "done" || x === "missed");
+                            const sts = rows
+                              .map((r) => stateOf(r, s))
+                              .filter((x) => x === "done" || x === "missed");
                             if (sts.length > 0) {
                               const frac = sts.filter((x) => x === "done").length / sts.length;
-                              style = { backgroundColor: "var(--rust)", opacity: 0.15 + 0.85 * frac };
+                              style = {
+                                backgroundColor: "var(--rust)",
+                                opacity: 0.15 + 0.85 * frac,
+                              };
                             }
                           }
                           return (
@@ -368,7 +432,10 @@ export function TrackerView({
                     >
                       <div className="flex items-center justify-between gap-3">
                         <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-ink">
-                          <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: r.color }} />
+                          <span
+                            className="size-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: r.color }}
+                          />
                           <span className="truncate">{r.habit.name}</span>
                         </span>
                         <span className="shrink-0 text-xs tabular-nums text-ink-soft">
@@ -378,7 +445,10 @@ export function TrackerView({
                       <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-sand/60">
                         <div
                           className="h-full rounded-full"
-                          style={{ width: `${Math.round(r.rate * 100)}%`, backgroundColor: r.color }}
+                          style={{
+                            width: `${Math.round(r.rate * 100)}%`,
+                            backgroundColor: r.color,
+                          }}
                         />
                       </div>
                     </button>
