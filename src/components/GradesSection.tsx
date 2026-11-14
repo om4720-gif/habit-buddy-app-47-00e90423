@@ -26,6 +26,7 @@ import { ImportGrades } from "@/components/ImportGrades";
 import { UnsortedGrades, type UnsortedRow } from "@/components/UnsortedGrades";
 import { ScrollPad } from "@/components/ScrollPad";
 import { courseColor, gradeColor, scaleColor } from "@/lib/grade-colors";
+import { TargetSimulator } from "@/components/TargetSimulator";
 import { WeightsImport } from "@/components/WeightsImport";
 import { checkWeights, type WeightRow } from "@/lib/weights";
 import { Input } from "@/components/ui/input";
@@ -953,7 +954,19 @@ export function GradesSection({ courses }: { courses: Course[] }) {
                   >
                     + Add assessment
                   </Button>
-                  <Button
+                                    <TargetSimulator
+                    items={items.map((item) => ({
+                      title: item.title,
+                      weight: item.weight,
+                      is_final: item.is_final,
+                      marks: (item.marks ?? []).map((m) => ({ score: m.score, max_score: m.max_score })),
+                      best_count: item.best_count ?? null,
+                      expected_count: item.expected_count ?? null,
+                    }))}
+                    bands={bands.map((b) => ({ label: b.label, minimum: b.minimum }))}
+                    currentAverage={average}
+                  />
+<Button
                     type="button"
                     variant="ghost"
                     size="sm"
